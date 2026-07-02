@@ -787,7 +787,7 @@ function waOut(){
 }
 
 /* ── RAZORPAY CHECKOUT ── */
-var RAZORPAY_KEY_ID='rzp_test_T8XnVo4VhfDeRy'; // public key id — safe to expose in frontend
+var RAZORPAY_KEY_ID='rzp_live_T8giolS4Vjj451'; // public key id — safe to expose in frontend
 function rzpCheckout(){
   if(!cart.length){toast('Add items to cart first!');return;}
   var sub=cart.reduce(function(s,i){return s+i.price*i.qty;},0);
