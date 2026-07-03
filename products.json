@@ -135,21 +135,5 @@
       "L",
       "XL"
     ]
-  },
-  {
-    "id": "description-it",
-    "cat": "tshirt",
-    "catLabel": "T-Shirts",
-    "name": "Description It",
-    "label": "Description It",
-    "price": 1799,
-    "originalPrice": null,
-    "badge": null,
-    "description": "A fitness it — a premium quality piece built for everyday comfort and street-ready style.",
-    "image": "https://raw.githubusercontent.com/ryzenariser/ryzen/main/images/1783096316747-pexels-photo-30752887-2.webp",
-    "sizes": [
-      "M",
-      "L"
-    ]
   }
 ]
