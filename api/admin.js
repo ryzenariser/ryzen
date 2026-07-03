@@ -1,39 +1,3 @@
-const crypto = require('crypto');
-
-const GITHUB_API = 'https://api.github.com';
-const PRODUCTS_PATH = 'products.json';
-const FACE_PATH = 'face.json';
-const BRANCH = 'main';
-
-// Strips anything that looks like base64 image data out of a string before it is
-// logged or sent back to a client. External APIs sometimes echo request payloads
-// back in error bodies — this makes sure a photo never leaks that way.
-function redact(str) {
-  if (typeof str !== 'string') return str;
-  return str.replace(/[A-Za-z0-9+/]{200,}={0,2}/g, '[image data redacted]');
-}
-
-function ghHeaders() {
-  return {
-    Authorization: `Bearer ${process.env.GITHUB_TOKEN}`,
-    Accept: 'application/vnd.github+json',
-    'Content-Type': 'application/json',
-  };
-}
-
-function repoUrl(path) {
-  const owner = process.env.GITHUB_OWNER;
-  const repo = process.env.GITHUB_REPO;
-  return `${GITHUB_API}/repos/${owner}/${repo}/contents/${path}`;
-}
-
-function signToken() {
-  const secret = process.env.RAZORPAY_KEY_SECRET;
-  const expiry = Date.now() + 1000 * 60 * 60 * 6; // 6 hours
-  const sig = crypto.createHmac('sha256', secret).update(String(expiry)).digest('hex');
-  return `${expiry}.${sig}`;
-}
-
 function verifyToken(token) {
   if (!token || typeof token !== 'string' || !token.includes('.')) return false;
   const [expiry, sig] = token.split('.');
