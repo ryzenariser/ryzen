@@ -263,6 +263,7 @@ button{cursor:pointer;border:none;background:none;font-family:inherit}
 .qv-lbl{font-family:'Montserrat',sans-serif;font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;margin-bottom:8px}
 .qv-szs{display:flex;gap:7px;flex-wrap:wrap}
 .sz{font-family:'Montserrat',sans-serif;font-size:10px;font-weight:600;width:38px;height:38px;border:1.5px solid var(--gray2);background:none;cursor:pointer;transition:var(--t);display:flex;align-items:center;justify-content:center}
+#sz-custom{width:auto;padding:0 10px}
 .sz:hover{border-color:var(--dark)}
 .sz.on{border-color:var(--dark);background:var(--dark);color:var(--white)}
 .qv-desc{font-size:12px;color:var(--gray);line-height:1.7}
@@ -278,6 +279,36 @@ button{cursor:pointer;border:none;background:none;font-family:inherit}
 .sg-tbl td{padding:10px 14px;border-bottom:1px solid rgba(0,0,0,.06)}
 .sg-tbl tr:nth-child(even) td{background:var(--bone)}
 .sg-note{font-size:10px;color:var(--gray);margin-top:14px;font-family:'Montserrat',sans-serif;line-height:1.5}
+
+/* DELIVERY ADDRESS */
+#addr{position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:1950;display:none;align-items:center;justify-content:center;padding:20px}
+#addr.open{display:flex}
+.addr-box{background:var(--white);max-width:560px;width:100%;padding:36px 40px;position:relative;max-height:90vh;overflow-y:auto}
+.addr-x{position:absolute;top:14px;right:16px;font-size:24px;background:none;border:none;cursor:pointer;color:var(--dark);line-height:1}
+.addr-x:hover{color:var(--gold)}
+.addr-ttl{font-family:'Montserrat',sans-serif;font-size:13px;font-weight:800;letter-spacing:2px;text-transform:uppercase;margin-bottom:6px}
+.addr-sub{font-size:12px;color:var(--gray);line-height:1.6;margin-bottom:22px}
+.addr-form{display:flex;flex-direction:column;gap:14px}
+.addr-row{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.addr-fld{display:flex;flex-direction:column;gap:6px}
+.addr-lbl{font-family:'Montserrat',sans-serif;font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--dark)}
+.addr-inp{font-family:'Inter',sans-serif;font-size:13px;padding:11px 12px;border:1.5px solid var(--gray2);background:var(--white);color:var(--dark);outline:none;transition:border-color var(--t);width:100%}
+.addr-inp:focus{border-color:var(--gold)}
+.addr-inp.err{border-color:#c62828}
+.addr-errmsg{font-size:10px;color:#c62828;font-family:'Montserrat',sans-serif;letter-spacing:.5px;display:none}
+.addr-errmsg.show{display:block}
+.addr-note{font-size:10px;color:var(--gray);line-height:1.6;margin-top:4px;font-family:'Montserrat',sans-serif}
+select.addr-inp{appearance:none;-webkit-appearance:none;background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6'><path d='M0 0l5 6 5-6z' fill='%23888'/></svg>");background-repeat:no-repeat;background-position:right 12px center;padding-right:30px}
+.addr-inp[readonly]{background:var(--bone);color:var(--gray);cursor:not-allowed}
+.addr-inp:disabled{background:var(--bone);color:var(--gray);cursor:not-allowed}
+.addr-status{font-size:10px;font-family:'Montserrat',sans-serif;letter-spacing:.5px;display:none}
+.addr-status.show{display:block}
+.addr-status.ok{color:#2e7d32}
+.addr-status.bad{color:#c62828}
+.addr-status.busy{color:var(--gray)}
+.addr-confirm{display:flex;align-items:flex-start;gap:8px;font-size:11px;color:var(--dark);line-height:1.5;cursor:pointer;margin-top:4px}
+.addr-confirm input{margin-top:2px;flex-shrink:0;width:14px;height:14px;accent-color:var(--gold)}
+@media(max-width:520px){.addr-row{grid-template-columns:1fr}.addr-box{padding:30px 22px}}
 
 /* TOAST */
 #toast{position:fixed;bottom:26px;left:50%;transform:translateX(-50%) translateY(16px);background:var(--dark);color:var(--white);font-family:'Montserrat',sans-serif;font-size:11px;font-weight:600;letter-spacing:1.5px;text-transform:uppercase;padding:13px 26px;z-index:3000;opacity:0;transition:opacity .3s,transform .3s;pointer-events:none;white-space:nowrap;border-left:3px solid var(--gold)}
@@ -601,7 +632,7 @@ button{cursor:pointer;border:none;background:none;font-family:inherit}
       <div class='crow' id='disc-row' style='display:none'><span class='dval' id='disc-lbl'>Discount</span><span class='dval' id='disc-amt'></span></div>
       <div class='crow tot'><span>Total</span><span id='c-tot'>&#8377;0</span></div>
     </div>
-    <button class='btn btn-gold' id='rzp-btn' onclick='rzpCheckout()' style='width:100%'>
+    <button class='btn btn-gold' id='rzp-btn' onclick='openAddr()' style='width:100%'>
       Pay Now
     </button>
   </div>
@@ -627,9 +658,23 @@ button{cursor:pointer;border:none;background:none;font-family:inherit}
       <div>
         <div class='qv-lbl'>Select Size <button onclick='openSG()' style='font-family:Montserrat,sans-serif;font-size:9px;color:var(--gold);background:none;border:none;cursor:pointer;letter-spacing:1px;text-transform:uppercase;text-decoration:underline;margin-left:8px'>Size Guide</button></div>
         <div class='qv-szs'><button class='sz' onclick='selSz(this)'>S</button><button class='sz' onclick='selSz(this)'>M</button><button class='sz' onclick='selSz(this)'>L</button><button class='sz' onclick='selSz(this)'>XL</button><button class='sz' onclick='selSz(this)'>XXL</button></div>
+        <div style='margin-top:10px'>
+          <button class='sz' id='sz-custom' onclick='selCustom(this)' style='width:100%;height:auto;padding:8px 0'>+ Customize My Size</button>
+        </div>
+      </div>
+      <div id='qv-custom-box' style='display:none;margin-top:10px;padding:10px;border:1px solid #333;'>
+        <div style='font-size:11px;letter-spacing:1px;text-transform:uppercase;color:#aaa;margin-bottom:6px;'>Your Measurements (in)</div>
+        <div style='display:grid;grid-template-columns:1fr 1fr;gap:8px;'>
+          <input type='number' id='cm-shoulder' placeholder='Shoulder' style='padding:6px;'>
+          <input type='number' id='cm-chest' placeholder='Chest' style='padding:6px;'>
+          <input type='number' id='cm-hip' placeholder='Hip' style='padding:6px;'>
+          <input type='number' id='cm-length' placeholder='Length' style='padding:6px;'>
+        </div>
+        <div style='margin-top:8px;font-size:12px;color:var(--gold);'>+ &#8377;870 customization fee applies</div>
       </div>
       <p class='qv-desc'>Premium quality fabric with a tailored fit. Pre-order now &#8212; production begins once the 60-day window closes.</p>
-      <button class='btn btn-gold' id='qv-atc' onclick='qvATC()' style='width:100%;margin-top:4px'>Add to Cart</button>
+      <button class='btn btn-gold' id='qv-book' onclick='qvBookNow()' style='width:100%;margin-top:10px'>Book Now</button>
+      <button class='btn btn-od' id='qv-atc' onclick='qvATC()' style='width:100%;margin-top:8px'>Add to Cart</button>
       <a class='btn btn-od btn-sm' href='#' id='qv-link' style='width:100%;margin-top:6px'>View Full Details</a>
     </div>
   </div>
@@ -642,13 +687,89 @@ button{cursor:pointer;border:none;background:none;font-family:inherit}
     <div class='sg-ttl'>Size Guide</div>
     <table class='sg-tbl'>
       <tr><th>Size</th><th>Shoulder (in)</th><th>Chest (in)</th><th>Hip (in)</th><th>Length (in)</th></tr>
-<tr><td>S</td><td>16&#8211;17</td><td>36&#8211;38</td><td>36&#8211;38</td><td>26&#8211;27</td></tr>
-<tr><td>M</td><td>17&#8211;18</td><td>38&#8211;40</td><td>38&#8211;40</td><td>27&#8211;28</td></tr>
-<tr><td>L</td><td>18&#8211;19</td><td>40&#8211;42</td><td>40&#8211;42</td><td>28&#8211;29</td></tr>
-<tr><td>XL</td><td>19&#8211;20</td><td>42&#8211;44</td><td>42&#8211;44</td><td>29&#8211;30</td></tr>
-<tr><td>XXL</td><td>20&#8211;21</td><td>44&#8211;46</td><td>44&#8211;46</td><td>30&#8211;31</td></tr>
+<tr><td>S</td><td>16</td><td>36</td><td>36</td><td>26</td></tr>
+<tr><td>M</td><td>18</td><td>38</td><td>38</td><td>28</td></tr>
+<tr><td>L</td><td>20</td><td>40</td><td>40</td><td>30</td></tr>
+<tr><td>XL</td><td>22</td><td>42</td><td>42</td><td>32</td></tr>
+<tr><td>XXL</td><td>24</td><td>44</td><td>44</td><td>34</td></tr>
     </table>
+    <div class='sg-finder' style='margin-top:16px;padding-top:16px;border-top:1px solid #333;'>
+      <div style='font-weight:600;margin-bottom:8px;'>Find Your Size</div>
+      <label style='font-size:13px;'>Enter your Chest measurement (in inches)</label><br>
+      <input type='number' id='sgChestInput' placeholder='e.g. 39' style='margin:8px 0;padding:6px;width:100px;'>
+      <button onclick='findMySize()' style='margin-left:8px;padding:6px 14px;background:var(--gold);border:none;cursor:pointer;'>Find My Size</button>
+      <div id='sgResult' style='margin-top:10px;font-weight:600;'></div>
+    </div>
     <p class='sg-note'>All measurements in inches. When between sizes, size up for a relaxed fit.</p>
+  </div>
+</div>
+
+<!-- DELIVERY ADDRESS -->
+<div id='addr'>
+  <div class='addr-box'>
+    <button class='addr-x' onclick='closeAddr()'>&#215;</button>
+    <div class='addr-ttl'>Delivery Details</div>
+    <div class='addr-sub'>Tell us where to ship your order. We'll use these details to deliver your package and keep you updated.</div>
+    <form class='addr-form' id='addr-form' onsubmit='return submitAddr(event)'>
+      <div class='addr-row'>
+        <div class='addr-fld'>
+          <label class='addr-lbl' for='addr-name'>Full Name</label>
+          <input class='addr-inp' id='addr-name' type='text' placeholder='e.g. Aditya Sharma' autocomplete='name'/>
+          <span class='addr-errmsg' id='addr-name-err'>Please enter your full name</span>
+        </div>
+        <div class='addr-fld'>
+          <label class='addr-lbl' for='addr-phone'>Phone Number</label>
+          <input class='addr-inp' id='addr-phone' type='tel' placeholder='10-digit mobile number' autocomplete='tel'/>
+          <span class='addr-errmsg' id='addr-phone-err'>Please enter a valid phone number</span>
+        </div>
+      </div>
+      <div class='addr-fld'>
+        <label class='addr-lbl' for='addr-email'>Email Address</label>
+        <input class='addr-inp' id='addr-email' type='email' placeholder='you@example.com' autocomplete='email'/>
+        <span class='addr-errmsg' id='addr-email-err'>Please enter a valid email address</span>
+      </div>
+      <div class='addr-fld'>
+        <label class='addr-lbl' for='addr-country'>Country</label>
+        <input class='addr-inp' id='addr-country' type='text' value='India' readonly/>
+      </div>
+      <div class='addr-row'>
+        <div class='addr-fld'>
+          <label class='addr-lbl' for='addr-state'>State</label>
+          <select class='addr-inp' id='addr-state' autocomplete='address-level1' onchange='onStateChange()'>
+            <option value=''>Select State</option>
+          </select>
+          <span class='addr-errmsg' id='addr-state-err'>Please select your state</span>
+        </div>
+        <div class='addr-fld'>
+          <label class='addr-lbl' for='addr-city'>District / City</label>
+          <select class='addr-inp' id='addr-city' autocomplete='address-level2' disabled onchange='clearPinStatus()'>
+            <option value=''>Select State First</option>
+          </select>
+          <span class='addr-errmsg' id='addr-city-err'>Please select your district / city</span>
+        </div>
+      </div>
+      <div class='addr-fld'>
+        <label class='addr-lbl' for='addr-pincode'>Pincode</label>
+        <input class='addr-inp' id='addr-pincode' type='text' inputmode='numeric' maxlength='6' placeholder='6-digit pincode' autocomplete='postal-code' oninput='onPincodeInput()'/>
+        <span class='addr-errmsg' id='addr-pincode-err'>Please enter a valid 6-digit pincode</span>
+        <span class='addr-status' id='addr-pincode-status'></span>
+        <label class='addr-confirm' id='addr-pincode-confirm-row' style='display:none'>
+          <input id='addr-pincode-confirm' type='checkbox'/>
+          <span>I confirm this pincode is correct for my address</span>
+        </label>
+      </div>
+      <div class='addr-fld'>
+        <label class='addr-lbl' for='addr-line1'>Address Line 1</label>
+        <input class='addr-inp' id='addr-line1' type='text' placeholder='House no., Building, Street' autocomplete='address-line1'/>
+        <span class='addr-errmsg' id='addr-line1-err'>Please enter a valid address</span>
+      </div>
+      <div class='addr-fld'>
+        <label class='addr-lbl' for='addr-line2'>Address Line 2 <span style='font-weight:400;text-transform:none;letter-spacing:0'>(optional)</span></label>
+        <input class='addr-inp' id='addr-line2' type='text' placeholder='Landmark, Area' autocomplete='address-line2'/>
+      </div>
+      <button class='btn btn-gold' type='submit' style='width:100%;margin-top:6px'>Continue to Payment</button>
+      <p class='addr-note'>Your details are used only to process and deliver this order.</p>
+    </form>
   </div>
 </div>
 
@@ -667,6 +788,17 @@ var COUPONS = {'RYZEN10':10,'RYZEN20':20,'FIRST15':15,'LAUNCH':20,'WELCOME':10};
 
 /* ── STATE ── */
 var cart=[], wl=[], disc=0, coupon=null, qvP={}, qvSz='';
+
+/* ── SIZE FINDER ── */
+var SIZE_CHART=[{size:'S',chest:36},{size:'M',chest:38},{size:'L',chest:40},{size:'XL',chest:42},{size:'XXL',chest:44}];
+function findMySize(){
+  var val=parseFloat(document.getElementById('sgChestInput').value);
+  var r=document.getElementById('sgResult');
+  if(!val||val<20||val>60){r.textContent='Please enter a valid chest measurement.';return;}
+  var closest=SIZE_CHART[0],minDiff=Math.abs(val-closest.chest);
+  SIZE_CHART.forEach(function(row){var d=Math.abs(val-row.chest);if(d<minDiff){minDiff=d;closest=row;}});
+  r.textContent='Recommended Size: '+closest.size;
+}
 
 /* ── SCROLL ── */
 window.addEventListener('scroll',function(){
@@ -786,170 +918,16 @@ function waOut(){
   window.open('https://wa.me/'+WA+'?text='+encodeURIComponent(lines.join('\n')),'_blank');
 }
 
-/* ── RAZORPAY CHECKOUT ── */
-var RAZORPAY_KEY_ID='rzp_live_T8giolS4Vjj451'; // public key id — safe to expose in frontend
-function rzpCheckout(){
-  if(!cart.length){toast('Add items to cart first!');return;}
-  var sub=cart.reduce(function(s,i){return s+i.price*i.qty;},0);
-  var da=Math.round(sub*disc/100);
-  var tot=sub-da;
-  var btn=document.getElementById('rzp-btn');
-  btn.disabled=true;
-  btn.textContent='Processing...';
+/* ── DELIVERY ADDRESS ── */
+var shipInfo=null;
+var pinStatus='idle'; /* idle | checking | ok | mismatch | notfound | unreachable */
 
-  fetch('/api/create-order',{
-    method:'POST',
-    headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({amount:Math.round(tot*100),currency:'INR',receipt:'ryzen_'+Date.now()})
-  })
-  .then(function(r){return r.json();})
-  .then(function(data){
-    btn.disabled=false;
-    btn.textContent='Pay Now';
-    if(!data.order_id){
-      toast('Could not start payment. Try again.');
-      return;
-    }
-    var options={
-      key:RAZORPAY_KEY_ID,
-      amount:data.amount,
-      currency:data.currency,
-      name:'Ryzen',
-      description:'Pre-Order Payment',
-      order_id:data.order_id,
-      theme:{color:'#C9A84C'},
-      handler:function(response){
-        fetch('/api/verify-payment',{
-          method:'POST',
-          headers:{'Content-Type':'application/json'},
-          body:JSON.stringify({
-            razorpay_order_id:response.razorpay_order_id,
-            razorpay_payment_id:response.razorpay_payment_id,
-            razorpay_signature:response.razorpay_signature
-          })
-        })
-        .then(function(r){return r.json();})
-        .then(function(v){
-          if(v.success){
-            toast('Payment successful! Order confirmed.');
-            cart=[];
-            updateCart();
-            closeCart();
-          }else{
-            toast('Payment verification failed. Contact support.');
-          }
-        })
-        .catch(function(){toast('Verification error. Contact support.');});
-      },
-      modal:{
-        ondismiss:function(){toast('Payment cancelled.');}
-      }
-    };
-    var rzp=new Razorpay(options);
-    rzp.on('payment.failed',function(resp){
-      toast('Payment failed: '+resp.error.description);
-    });
-    rzp.open();
-  })
-  .catch(function(){
-    btn.disabled=false;
-    btn.textContent='Pay Now';
-    toast('Network error. Please try again.');
-  });
-}
-
-/* ── WISHLIST ── */
-function openWL(){
-  document.getElementById('wl-sb').classList.add('open');
-  document.getElementById('wl-ov').classList.add('open');
-  document.body.style.overflow='hidden';
-}
-function closeWL(){
-  document.getElementById('wl-sb').classList.remove('open');
-  document.getElementById('wl-ov').classList.remove('open');
-  document.body.style.overflow='';
-}
-function togWL(btn,e){
-  e.stopPropagation();
-  var card=btn.closest('.pc');
-  var name=card.dataset.name||'Item';
-  var price=card.dataset.price||'0';
-  btn.classList.toggle('won');
-  if(btn.classList.contains('won')){
-    wl.push({name:name,price:+price});
-    toast(name+' added to wishlist!');
-  }else{
-    wl=wl.filter(function(i){return i.name!==name;});
-    toast(name+' removed from wishlist.');
-  }
-  updateWL();
-}
-function rmWL(name){
-  wl=wl.filter(function(i){return i.name!==name;});
-  document.querySelectorAll('.pc').forEach(function(c){
-    if(c.dataset.name===name){var wb=c.querySelector('.wbtn');if(wb)wb.classList.remove('won');}
-  });
-  updateWL();
-  toast(name+' removed from wishlist.');
-}
-function updateWL(){
-  document.getElementById('wl-b').textContent=wl.length;
-  document.getElementById('wl-cnt').textContent=wl.length;
-  var list=document.getElementById('wl-list');
-  if(!wl.length){
-    list.innerHTML='<div class="empty-s"><div class="empty-ico">&#10084;</div><p class="empty-lbl">No saved items yet</p></div>';
-    return;
-  }
-  list.innerHTML=wl.map(function(i){
-    var en=i.name.replace(/'/g,"\\'");
-    return '<div class="wl-item"><div class="wl-img"></div><div class="wl-info"><div class="wl-name">'+i.name+'</div><div class="wl-price">&#8377;'+i.price.toLocaleString('en-IN')+'</div><div class="wl-acts"><button class="wl-atc" onclick="addToCart(\''+en+'\','+i.price+',\'M\');closeWL();">Add to Cart</button><button class="wl-rm" onclick="rmWL(\''+en+'\')">Remove</button></div></div></div>';
-  }).join('');
-}
-
-/* ── QUICK VIEW ── */
-function openQV(btn,e){
-  e.stopPropagation();
-  var card=btn.closest('.pc');
-  var name=card.dataset.name||'Product';
-  var price=card.dataset.price||'0';
-  var catEl=card.querySelector('.pcat');
-  var priceEl=card.querySelector('.pprice');
-  var label=card.dataset.label||'';
-  qvP={name:name,price:+price,label:label};
-  qvSz='';
-  document.getElementById('qv-cat').textContent=catEl?catEl.textContent:'';
-  document.getElementById('qv-name').textContent=name;
-  document.getElementById('qv-price').innerHTML=priceEl?priceEl.innerHTML:'&#8377;'+parseInt(price).toLocaleString('en-IN');
-  document.getElementById('qv-link').href=label?'/search/label/'+label:'#';
-  document.querySelectorAll('.sz').forEach(function(b){b.classList.remove('on');});
-  document.getElementById('qv-atc').textContent='Add to Cart';
-  document.getElementById('qv').classList.add('open');
-  document.body.style.overflow='hidden';
-}
-function closeQV(){document.getElementById('qv').classList.remove('open');document.body.style.overflow='';}
-document.getElementById('qv').addEventListener('click',function(e){if(e.target===this)closeQV();});
-function selSz(btn){document.querySelectorAll('.sz').forEach(function(b){b.classList.remove('on');});btn.classList.add('on');qvSz=btn.textContent.trim();}
-function qvATC(){
-  if(!qvSz){toast('Please select a size first');return;}
-  addToCart(qvP.name,qvP.price,qvSz);
-  closeQV();
-  openCart();
-}
-
-/* ── CARD CLICK HANDLER ── */
-function attachClicks(){
-  document.querySelectorAll('.pc').forEach(function(card){
-    card.addEventListener('click',function(e){
-      if(e.target.closest('.wbtn')||e.target.closest('.qvbtn'))return;
-      var qb=card.querySelector('.qvbtn');
-      if(qb)openQV(qb,e);
-    });
-  });
-}
-attachClicks();
-
-//]]>
-</script>
-
-</body>
-</html>
+/* State -> District list. Compiled from publicly known administrative
+   divisions; boundaries/new districts do get added over time, so treat
+   this as a good-faith reference and update if your ops team flags gaps. */
+var DISTRICTS_BY_STATE={
+"Andhra Pradesh":["Alluri Sitharama Raju","Anakapalli","Anantapur","Annamayya","Bapatla","Chittoor","East Godavari","Eluru","Guntur","Kakinada","Konaseema","Krishna","Kurnool","Nandyal","NTR","Palnadu","Parvathipuram Manyam","Prakasam","Sri Potti Sriramulu Nellore","Srikakulam","Sri Sathya Sai","Tirupati","Visakhapatnam","Vizianagaram","West Godavari","YSR Kadapa"],
+"Arunachal Pradesh":["Anjaw","Changlang","Dibang Valley","East Kameng","East Siang","Kamle","Kra Daadi","Kurung Kumey","Lepa Rada","Lohit","Longding","Lower Dibang Valley","Lower Siang","Lower Subansiri","Namsai","Pakke Kessang","Papum Pare","Shi Yomi","Siang","Tawang","Tirap","Upper Siang","Upper Subansiri","West Kameng","West Siang"],
+"Assam":["Baksa","Barpeta","Biswanath","Bongaigaon","Cachar","Charaideo","Chirang","Darrang","Dhemaji","Dhubri","Dibrugarh","Dima Hasao","Goalpara","Golaghat","Hailakandi","Hojai","Jorhat","Kamrup","Kamrup Metropolitan","Karbi Anglong","Karimganj","Kokrajhar","Lakhimpur","Majuli","Morigaon","Nagaon","Nalbari","Sivasagar","Sonitpur","South Salmara-Mankachar","Tinsukia","Udalguri","West Karbi Anglong"],
+"Bihar":["Araria","Arwal","Aurangabad","Banka","Begusarai","Bhagalpur","Bhojpur","Buxar","Darbhanga","East Champaran","Gaya","Gopalganj","Jamui","Jehanabad","Kaimur","Katihar","Khagaria","Kishanganj","Lakhisarai","Madhepura","Madhubani","Munger","Muzaffarpur","Nalanda","Nawada","Patna","Purnia","Rohtas","Saharsa","Samastipur","Saran","Sheikhpura","Sheohar","Sitamarhi","Siwan","Supaul","Vaishali","West Champaran"],
+"Chhattisgarh":["Balod","Baloda Bazar","Balrampur","Bastar","Bemetara","Bijapur","Bilaspur","Dantewada","Dhamtari","Durg","Gariaband","Gaurela-Pendra-Marwahi","Janjgir-Champa","Jashpur","Kabirdham","Kanker","Kondagaon","Korba","Koriya","Mahasamund","Manendragarh-Chirmiri-Bharatpur","Mohla-Manpur-Ambagarh
