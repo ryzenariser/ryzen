@@ -1,1 +1,1 @@
-
+delete admin.js
