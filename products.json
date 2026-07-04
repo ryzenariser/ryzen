@@ -1,0 +1,98 @@
+[
+  {
+    "id": "henley-tshirt",
+    "cat": "tshirt",
+    "catLabel": "T-Shirts",
+    "name": "Henley T-Shirt",
+    "label": "Henley",
+    "price": 1499,
+    "originalPrice": null,
+    "badge": "pre",
+    "image": "https://images.pexels.com/photos/907648/pexels-photo-907648.jpeg?auto=compress&cs=tinysrgb&w=600&q=80",
+    "sizes": ["S", "M", "L", "XL"]
+  },
+  {
+    "id": "raglan-tshirt",
+    "cat": "tshirt",
+    "catLabel": "T-Shirts",
+    "name": "Raglan T-Shirt",
+    "label": "Raglan",
+    "price": 1299,
+    "originalPrice": null,
+    "badge": "new",
+    "image": "https://images.pexels.com/photos/13651809/pexels-photo-13651809.jpeg?auto=compress&cs=tinysrgb&w=600&q=80",
+    "sizes": ["S", "M", "L", "XL"]
+  },
+  {
+    "id": "polo-tshirt",
+    "cat": "tshirt",
+    "catLabel": "T-Shirts",
+    "name": "Polo T-Shirt",
+    "label": "Polo",
+    "price": 1699,
+    "originalPrice": 1999,
+    "badge": "sale",
+    "image": "https://images.pexels.com/photos/10769408/pexels-photo-10769408.jpeg?auto=compress&cs=tinysrgb&w=600&q=80",
+    "sizes": ["S", "M", "L", "XL"]
+  },
+  {
+    "id": "cargo-pants",
+    "cat": "pants",
+    "catLabel": "Pants",
+    "name": "Cargo Pants",
+    "label": "Cargo",
+    "price": 2299,
+    "originalPrice": null,
+    "badge": "new",
+    "image": "https://images.pexels.com/photos/13424793/pexels-photo-13424793.jpeg?auto=compress&cs=tinysrgb&w=600&q=80",
+    "sizes": ["S", "M", "L", "XL"]
+  },
+  {
+    "id": "joggers",
+    "cat": "pants",
+    "catLabel": "Pants",
+    "name": "Joggers",
+    "label": "Joggers",
+    "price": 1899,
+    "originalPrice": null,
+    "badge": "pre",
+    "image": "https://images.pexels.com/photos/7199596/pexels-photo-7199596.jpeg?auto=compress&cs=tinysrgb&w=600&q=80",
+    "sizes": ["S", "M", "L", "XL"]
+  },
+  {
+    "id": "oversized-tee",
+    "cat": "tshirt",
+    "catLabel": "T-Shirts",
+    "name": "Oversized Tee",
+    "label": "Oversized",
+    "price": 1399,
+    "originalPrice": null,
+    "badge": "new",
+    "image": "https://images.pexels.com/photos/36942017/pexels-photo-36942017.jpeg?auto=compress&cs=tinysrgb&w=600&q=80",
+    "sizes": ["S", "M", "L", "XL", "XXL"]
+  },
+  {
+    "id": "coord-set",
+    "cat": "sets",
+    "catLabel": "Sets",
+    "name": "Co-ord Set",
+    "label": "Sets",
+    "price": 3499,
+    "originalPrice": 3999,
+    "badge": "pre",
+    "image": "https://images.pexels.com/photos/9775553/pexels-photo-9775553.jpeg?auto=compress&cs=tinysrgb&w=600&q=80",
+    "sizes": ["S", "M", "L", "XL"]
+  },
+  {
+    "id": "slim-chinos",
+    "cat": "pants",
+    "catLabel": "Pants",
+    "name": "Slim Chinos",
+    "label": "Chinos",
+    "price": 1999,
+    "originalPrice": null,
+    "badge": null,
+    "image": "https://images.pexels.com/photos/20559703/pexels-photo-20559703.jpeg?auto=compress&cs=tinysrgb&w=600&q=80",
+    "sizes": ["S", "M", "L", "XL"]
+  }
+]
