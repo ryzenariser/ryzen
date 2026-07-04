@@ -72,6 +72,44 @@ async function handleLogin(req, res) {
   });
 }
 
+  if (!username || !password) {
+    return res.status(400).json({ error: 'Username and password are required.' });
+  }
+
+  const { data: admin, error } = await supabase
+    .from('admins')
+    .select('*')
+    .eq('username', username)
+    .maybeSingle();
+
+  if (error) throw error;
+
+  if (!admin || !verifyPassword(password, admin.password_hash)) {
+    return res.status(401).json({ error: 'Incorrect username or password.' });
+  }
+
+  if (admin.deactivated_at) {
+    return res.status(401).json({ error: 'This account has been deactivated.' });
+  }
+
+  await logLogin(admin.id, req);
+
+  const token = signToken({
+    sub: admin.id,
+    role: admin.role,
+    username: admin.username,
+    permissions: admin.role === 'super_admin' ? FULL_PERMISSIONS : (admin.permissions || {}),
+    exp: Date.now() + TOKEN_TTL_MS,
+  });
+
+  return res.status(200).json({
+    token,
+    expiresInMs: TOKEN_TTL_MS,
+    role: admin.role,
+    mustChangePassword: !!admin.must_change_password,
+  });
+}
+
 async function handleDashboard(req, res) {
   const session = requireAuth(req, res);
   if (!session) return;
