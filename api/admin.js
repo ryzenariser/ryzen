@@ -3,10 +3,7 @@
 
 const { signToken, requireAuth, TOKEN_TTL_MS } = require('./_lib/auth');
 const { supabase } = require('./_lib/supabase');
-const { verifyPassword } = require('./_lib/passwords');
-
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD; // bootstrap fallback only
-const ADMIN_SECRET = process.env.ADMIN_SECRET;
+const { verifyPassword } = require('./_lib/password');
 
 const FULL_PERMISSIONS = {
   products: { view: true, edit: true, delete: true },
@@ -16,61 +13,79 @@ const FULL_PERMISSIONS = {
   admins: { view: true, edit: true, delete: true },
 };
 
+function getClientIp(req) {
+  const forwarded = req.headers['x-forwarded-for'];
+  if (forwarded) return forwarded.split(',')[0].trim();
+  return req.socket?.remoteAddress || 'unknown';
+}
+
+async function logLogin(adminId, req) {
+  try {
+    await supabase.from('admin_logins').insert({
+      admin_id: adminId,
+      ip_address: getClientIp(req),
+      user_agent: req.headers['user-agent'] || 'unknown',
+    });
+  } catch (err) {
+    console.error('logLogin failed:', err.message);
+  }
+}
+
 async function handleLogin(req, res) {
   const { username, password } = req.body || {};
 
-  if (!ADMIN_SECRET) {
-    return res.status(500).json({
-      error: 'Server not configured: ADMIN_SECRET missing in Vercel environment variables.',
-    });
+  if (!username || !password) {
+    return res.status(400).json({ error: 'Username and password are required.' });
   }
 
-  if (!password) {
-    return res.status(400).json({ error: 'Password is required.' });
+  const { data: admin, error } = await supabase
+    .from('admins')
+    .select('*')
+    .eq('username', username)
+    .maybeSingle();
+
+  if (error) throw error;
+
+  if (!admin || !verifyPassword(password, admin.password_hash)) {
+    return res.status(401).json({ error: 'Incorrect username or password.' });
   }
 
-  if (username) {
-    const { data: admin, error } = await supabase
-      .from('admins')
-      .select('*')
-      .eq('username', username)
-      .maybeSingle();
-
-    if (error) throw error;
-    if (!admin || !verifyPassword(password, admin.password_hash)) {
-      return res.status(401).json({ error: 'Incorrect username or password.' });
-    }
-
-    const token = signToken({
-      role: admin.role,
-      username: admin.username,
-      permissions: admin.role === 'super_admin' ? FULL_PERMISSIONS : (admin.permissions || {}),
-      exp: Date.now() + TOKEN_TTL_MS,
-    });
-    return res.status(200).json({ token, expiresInMs: TOKEN_TTL_MS, role: admin.role });
+  if (admin.deactivated_at) {
+    return res.status(401).json({ error: 'This account has been deactivated.' });
   }
 
-  if (!ADMIN_PASSWORD) {
-    return res.status(500).json({
-      error: 'Server not configured: ADMIN_PASSWORD missing in Vercel environment variables.',
-    });
-  }
-  if (password !== ADMIN_PASSWORD) {
-    return res.status(401).json({ error: 'Incorrect password.' });
-  }
+  await logLogin(admin.id, req);
 
   const token = signToken({
-    role: 'super_admin',
-    username: 'owner',
-    permissions: FULL_PERMISSIONS,
+    sub: admin.id,
+    role: admin.role,
+    username: admin.username,
+    permissions: admin.role === 'super_admin' ? FULL_PERMISSIONS : (admin.permissions || {}),
     exp: Date.now() + TOKEN_TTL_MS,
   });
-  return res.status(200).json({ token, expiresInMs: TOKEN_TTL_MS, role: 'super_admin' });
+
+  return res.status(200).json({
+    token,
+    expiresInMs: TOKEN_TTL_MS,
+    role: admin.role,
+    mustChangePassword: !!admin.must_change_password,
+  });
 }
 
 async function handleDashboard(req, res) {
   const session = requireAuth(req, res);
   if (!session) return;
+
+  // Re-check deactivation live, not just at login time
+  const { data: admin } = await supabase
+    .from('admins')
+    .select('deactivated_at')
+    .eq('id', session.sub)
+    .maybeSingle();
+
+  if (admin?.deactivated_at) {
+    return res.status(401).json({ error: 'This account has been deactivated.' });
+  }
 
   let productCount = 0;
   let pageCount = 0;
