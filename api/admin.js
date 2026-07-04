@@ -24,16 +24,18 @@ function getClientIp(req) {
 
 async function logAttempt(req, { username, role, success, reason }) {
   try {
-    await supabase.from('login_logs').insert([{
+    const { data } = await supabase.from('login_logs').insert([{
       username: username || null,
       role: role || null,
       ip_address: getClientIp(req),
       user_agent: req.headers['user-agent'] || null,
       success: !!success,
       reason: reason || null,
-    }]);
+    }]).select().single();
+    return data;
   } catch (err) {
     console.error('login_logs insert failed:', err.message);
+    return null;
   }
 }
 
@@ -70,8 +72,13 @@ async function handleLogin(req, res) {
       permissions: admin.role === 'super_admin' ? FULL_PERMISSIONS : (admin.permissions || {}),
       exp: Date.now() + TOKEN_TTL_MS,
     });
-    await logAttempt(req, { username: admin.username, role: admin.role, success: true });
-    return res.status(200).json({ token, expiresInMs: TOKEN_TTL_MS, role: admin.role });
+    const logEntry = await logAttempt(req, { username: admin.username, role: admin.role, success: true });
+    return res.status(200).json({
+      token,
+      expiresInMs: TOKEN_TTL_MS,
+      role: admin.role,
+      loginLogId: admin.role === 'sub_admin' ? (logEntry && logEntry.id) : null,
+    });
   }
 
   if (!ADMIN_PASSWORD) {
@@ -137,7 +144,18 @@ async function handleLoginLogs(req, res) {
     .limit(100);
 
   if (error) throw error;
-  return res.status(200).json({ logs: data });
+
+  const logsWithPhotos = await Promise.all(
+    data.map(async (log) => {
+      if (!log.photo_path) return { ...log, photo_url: null };
+      const { data: signed } = await supabase.storage
+        .from('login-photos')
+        .createSignedUrl(log.photo_path, 3600);
+      return { ...log, photo_url: signed ? signed.signedUrl : null };
+    })
+  );
+
+  return res.status(200).json({ logs: logsWithPhotos });
 }
 
 module.exports = async function handler(req, res) {
