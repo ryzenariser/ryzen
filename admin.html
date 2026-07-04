@@ -205,7 +205,12 @@ tr:last-child td{border-bottom:none}
         </div>
         <div class="field"><label>Sizes (comma separated)</label><input id="p-sizes" placeholder="S, M, L, XL" required /></div>
       </div>
-      <div class="field"><label>Image URL</label><input id="p-image" required /></div>
+      <div class="field">
+  <label>Image URL</label>
+  <input id="p-image" required />
+  <input type="file" id="p-image-file" accept="image/*" style="margin-top:6px;" />
+  <div id="p-image-upload-status" style="font-size:11px;color:var(--gray);margin-top:4px;"></div>
+</div>
       <div class="field"><label>Description</label><textarea id="p-description" rows="3"></textarea></div>
       <div class="error-msg" id="product-error"></div>
       <div class="modal-actions">
@@ -594,6 +599,55 @@ async function sendAssistMessage() {
 }
 document.getElementById('assist-send').addEventListener('click', sendAssistMessage);
 document.getElementById('assist-text').addEventListener('keydown', (e) => { if (e.key === 'Enter') sendAssistMessage(); });
+
+document.getElementById('p-image-file').addEventListener('change', async function (e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const statusEl = document.getElementById('p-image-upload-status');
+  statusEl.textContent = 'Uploading…';
+  const formData = new FormData();
+  formData.append('file', file);
+  try {
+    const res = await fetch('/api/upload', {
+      method: 'POST',
+      headers: { Authorization: 'Bearer ' + getToken() },
+      body: formData,
+    });
+    const data = await res.json();
+    if (data.url) {
+      document.getElementById('p-image').value = data.url;
+      statusEl.textContent = 'Uploaded ✓';
+    } else {
+      statusEl.textContent = 'Upload failed: ' + (data.error || 'unknown error');
+    }
+  } catch (err) {
+    statusEl.textContent = 'Upload failed: ' + err.message;
+  }
+});
+document.getElementById('p-image-file').addEventListener('change', async function (e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const statusEl = document.getElementById('p-image-upload-status');
+  statusEl.textContent = 'Uploading…';
+  const formData = new FormData();
+  formData.append('file', file);
+  try {
+    const res = await fetch('/api/upload', {
+      method: 'POST',
+      headers: { Authorization: 'Bearer ' + getToken() },
+      body: formData,
+    });
+    const data = await res.json();
+    if (data.url) {
+      document.getElementById('p-image').value = data.url;
+      statusEl.textContent = 'Uploaded ✓';
+    } else {
+      statusEl.textContent = 'Upload failed: ' + (data.error || 'unknown error');
+    }
+  } catch (err) {
+    statusEl.textContent = 'Upload failed: ' + err.message;
+  }
+});
 
 /* ---------- Init ---------- */
 if (getToken()) showApp(); else showLogin();
