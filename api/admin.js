@@ -52,13 +52,19 @@ async function getProductsFile() {
   return { products: JSON.parse(content), sha: data.sha };
 }
 
-async function putProductsFile(products, sha, message) {
+async function putProductsFile(products, sha, message, attempt) {
+  attempt = attempt || 1;
   const content = Buffer.from(JSON.stringify(products, null, 2)).toString('base64');
   const r = await fetch(repoUrl(PRODUCTS_PATH), {
     method: 'PUT',
     headers: ghHeaders(),
     body: JSON.stringify({ message, content, sha, branch: BRANCH }),
   });
+  if (r.status === 409 && attempt < 3) {
+    await new Promise((resolve) => setTimeout(resolve, 400 * attempt));
+    const fresh = await getProductsFile();
+    return putProductsFile(products, fresh.sha, message, attempt + 1);
+  }
   if (!r.ok) {
     const err = await r.text();
     throw new Error('Could not write products.json: ' + redact(err));
