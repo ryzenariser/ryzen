@@ -5,6 +5,7 @@
   "dependencies": {
     "razorpay": "^2.9.4",
     "@vladmandic/face-api": "^1.7.13",
-"@tensorflow/tfjs-node": "^4.20.0"
+    "@tensorflow/tfjs-node": "^4.20.0",
+    "@supabase/supabase-js": "^2.45.0"
   }
 }
