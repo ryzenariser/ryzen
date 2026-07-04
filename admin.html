@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Ryzen — Admin</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0b0b0c;
+    --panel: #141416;
+    --panel-line: #232326;
+    --text: #ece9e4;
+    --text-dim: #8f8b85;
+    --bronze: #c9a66b;
+    --bronze-dim: #8a744f;
+    --danger: #c0553f;
+    --ok: #6a8f6b;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Inter', -apple-system, sans-serif;
+    min-height: 100vh;
+  }
+  h1, h2, h3, .display {
+    font-family: 'Syne', sans-serif;
+    letter-spacing: -0.01em;
+  }
+
+  /* ---------- Login screen ---------- */
+  #login-screen {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+  }
+  .login-card {
+    width: 100%;
+    max-width: 380px;
+    background: var(--panel);
+    border: 1px solid var(--panel-line);
+    border-radius: 4px;
+    padding: 40px 32px;
+  }
+  .wordmark {
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: 0.3em;
+    color: var(--bronze);
+    text-transform: uppercase;
+    margin-bottom: 4px;
+  }
+  .wordmark-sub {
+    font-size: 12px;
+    color: var(--text-dim);
+    margin-bottom: 32px;
+  }
+  label {
+    display: block;
+    font-size: 12px;
+    color: var(--text-dim);
+    margin-bottom: 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+  input[type="password"], input[type="text"] {
+    width: 100%;
+    background: var(--bg);
+    border: 1px solid var(--panel-line);
+    border-radius: 3px;
+    color: var(--text);
+    padding: 12px 14px;
+    font-size: 14px;
+    font-family: 'Inter', sans-serif;
+    margin-bottom: 20px;
+  }
+  input:focus {
+    outline: none;
+    border-color: var(--bronze-dim);
+  }
+  button {
+    font-family: 'Inter', sans-serif;
+    cursor: pointer;
+  }
+  .btn-primary {
+    width: 100%;
+    background: var(--bronze);
+    color: #1a1509;
+    border: none;
+    border-radius: 3px;
+    padding: 13px;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+  }
+  .btn-primary:hover { background: #d9b57c; }
+  .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+  .error-msg {
+    color: var(--danger);
+    font-size: 13px;
+    margin: -8px 0 16px;
+    min-height: 18px;
+  }
+
+  /* ---------- Dashboard layout ---------- */
+  #app-screen { display: none; min-height: 100vh; }
+  .layout { display: flex; min-height: 100vh; }
+  .sidebar {
+    width: 220px;
+    background: var(--panel);
+    border-right: 1px solid var(--panel-line);
+    padding: 28px 0;
+    flex-shrink: 0;
+  }
+  .sidebar .wordmark { padding: 0 24px; margin-bottom: 2px; }
+  .sidebar .wordmark-sub { padding: 0 24px; margin-bottom: 28px; }
+  .nav-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 11px 24px;
+    font-size: 13px;
+    color: var(--text-dim);
+    cursor: pointer;
+    border-left: 2px solid transparent;
+  }
+  .nav-item.active {
+    color: var(--text);
+    border-left-color: var(--bronze);
+    background: rgba(201,166,107,0.06);
+  }
+  .nav-item.disabled {
+    color: #4a4a4d;
+    cursor: default;
+  }
+  .nav-tag {
+    font-size: 9px;
+    text-transform: uppercase;
+    background: var(--panel-line);
+    color: var(--text-dim);
+    padding: 2px 6px;
+    border-radius: 2px;
+    margin-left: auto;
+  }
+  .main { flex: 1; padding: 36px 44px; }
+  .topbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 32px;
+  }
+  .topbar h1 { font-size: 22px; margin: 0; }
+  .logout-link {
+    font-size: 12px;
+    color: var(--text-dim);
+    text-decoration: none;
+    cursor: pointer;
+    border: 1px solid var(--panel-line);
+    padding: 8px 14px;
+    border-radius: 3px;
+    background: transparent;
+  }
+  .logout-link:hover { border-color: var(--bronze-dim); color: var(--text); }
+
+  .stat-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+    margin-bottom: 36px;
+  }
+  .stat-card {
+    background: var(--panel);
+    border: 1px solid var(--panel-line);
+    border-radius: 4px;
+    padding: 22px;
+  }
+  .stat-card .num { font-family: 'Syne', sans-serif; font-size: 32px; font-weight: 700; }
+  .stat-card .label { font-size: 12px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.06em; margin-top: 6px; }
+
+  .placeholder-panel {
+    background: var(--panel);
+    border: 1px dashed var(--panel-line);
+    border-radius: 4px;
+    padding: 40px;
+    text-align: center;
+    color: var(--text-dim);
+    font-size: 13px;
+  }
+
+  @media (max-width: 640px) {
+    .layout { flex-direction: column; }
+    .sidebar { width: 100%; display: flex; overflow-x: auto; padding: 16px 0; }
+    .sidebar .wordmark, .sidebar .wordmark-sub { display: none; }
+    .nav-item { border-left: none; border-bottom: 2px solid transparent; white-space: nowrap; }
+    .nav-item.active { border-bottom-color: var(--bronze); }
+    .main { padding: 24px 20px; }
+    .stat-grid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+  <!-- ===== Login screen ===== -->
+  <div id="login-screen">
+    <div class="login-card">
+      <div class="wordmark">Ryzen</div>
+      <div class="wordmark-sub">Admin panel</div>
+      <form id="login-form">
+        <label for="password">Password</label>
+        <input type="password" id="password" autocomplete="current-password" required />
+        <div class="error-msg" id="login-error"></div>
+        <button type="submit" class="btn-primary" id="login-btn">Sign in</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- ===== Dashboard screen ===== -->
+  <div id="app-screen">
+    <div class="layout">
+      <div class="sidebar">
+        <div class="wordmark">Ryzen</div>
+        <div class="wordmark-sub">Admin panel</div>
+        <div class="nav-item active" data-tab="dashboard">Dashboard</div>
+        <div class="nav-item disabled">Orders <span class="nav-tag">Soon</span></div>
+        <div class="nav-item disabled">Products <span class="nav-tag">Soon</span></div>
+        <div class="nav-item disabled">Pages <span class="nav-tag">Soon</span></div>
+        <div class="nav-item disabled">Face ID <span class="nav-tag">Soon</span></div>
+      </div>
+      <div class="main">
+        <div class="topbar">
+          <h1>Dashboard</h1>
+          <button class="logout-link" id="logout-btn">Log out</button>
+        </div>
+        <div class="stat-grid">
+          <div class="stat-card">
+            <div class="num" id="stat-products">—</div>
+            <div class="label">Products</div>
+          </div>
+          <div class="stat-card">
+            <div class="num" id="stat-pages">—</div>
+            <div class="label">Pages</div>
+          </div>
+          <div class="stat-card">
+            <div class="num" id="stat-orders">—</div>
+            <div class="label">Orders</div>
+          </div>
+        </div>
+        <div class="placeholder-panel">
+          Products, Pages, Face ID login, and Orders are being rebuilt next.<br />
+          This dashboard will fill in as each piece comes online.
+        </div>
+      </div>
+    </div>
+  </div>
+
+<script>
+  const TOKEN_KEY = 'ryzen_admin_token';
+
+  const loginScreen = document.getElementById('login-screen');
+  const appScreen = document.getElementById('app-screen');
+  const loginForm = document.getElementById('login-form');
+  const loginError = document.getElementById('login-error');
+  const loginBtn = document.getElementById('login-btn');
+  const logoutBtn = document.getElementById('logout-btn');
+
+  function getToken() {
+    return localStorage.getItem(TOKEN_KEY);
+  }
+  function setToken(token) {
+    localStorage.setItem(TOKEN_KEY, token);
+  }
+  function clearToken() {
+    localStorage.removeItem(TOKEN_KEY);
+  }
+
+  function showApp() {
+    loginScreen.style.display = 'none';
+    appScreen.style.display = 'block';
+    loadDashboard();
+  }
+  function showLogin() {
+    appScreen.style.display = 'none';
+    loginScreen.style.display = 'flex';
+  }
+
+  loginForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    loginError.textContent = '';
+    loginBtn.disabled = true;
+    loginBtn.textContent = 'Signing in…';
+
+    const password = document.getElementById('password').value;
+
+    try {
+      const res = await fetch('/api/admin?action=login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password }),
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        loginError.textContent = data.error || 'Login failed.';
+        return;
+      }
+
+      setToken(data.token);
+      showApp();
+    } catch (err) {
+      loginError.textContent = 'Could not reach the server. Try again.';
+    } finally {
+      loginBtn.disabled = false;
+      loginBtn.textContent = 'Sign in';
+    }
+  });
+
+  logoutBtn.addEventListener('click', () => {
+    clearToken();
+    showLogin();
+  });
+
+  async function loadDashboard() {
+    try {
+      const res = await fetch('/api/admin?action=dashboard', {
+        headers: { Authorization: `Bearer ${getToken()}` },
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        clearToken();
+        showLogin();
+        return;
+      }
+
+      document.getElementById('stat-products').textContent = data.stats.products;
+      document.getElementById('stat-pages').textContent = data.stats.pages;
+      document.getElementById('stat-orders').textContent = data.stats.orders;
+    } catch (err) {
+      console.error('Dashboard load failed:', err);
+    }
+  }
+
+  // On page load, check if we already have a valid session
+  if (getToken()) {
+    showApp();
+  } else {
+    showLogin();
+  }
+</script>
+
+</body>
+</html>
