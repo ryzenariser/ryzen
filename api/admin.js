@@ -1,6 +1,5 @@
 // api/admin.js
 // Login + dashboard summary.
-
 const { signToken, requireAuth, TOKEN_TTL_MS } = require('./_lib/auth');
 const { supabase } = require('./_lib/supabase');
 const { verifyPassword } = require('./_lib/passwords');
