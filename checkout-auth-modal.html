@@ -1,0 +1,38 @@
+<!-- ===== CHECKOUT AUTH CHOICE ===== -->
+<div id='checkout-auth' style='position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:1960;display:none;align-items:center;justify-content:center;padding:20px'>
+  <div style='background:var(--white);max-width:420px;width:100%;padding:36px 34px;position:relative'>
+    <button onclick='closeCheckoutAuth()' style='position:absolute;top:12px;right:14px;font-size:24px;background:none;border:none;cursor:pointer;color:var(--dark);line-height:1'>&#215;</button>
+
+    <div id='ca-choice'>
+      <div style='font-family:Montserrat,sans-serif;font-size:13px;font-weight:800;letter-spacing:2px;text-transform:uppercase;margin-bottom:6px'>Almost there</div>
+      <p style='font-size:12px;color:var(--gray);line-height:1.6;margin-bottom:22px'>Sign in to save your address for next time, or continue as a guest.</p>
+      <button class='btn btn-gold' style='width:100%;margin-bottom:10px' onclick='caShow("signin")'>Sign In</button>
+      <button class='btn btn-od' style='width:100%;margin-bottom:10px' onclick='caShow("signup")'>Create Account</button>
+      <button style='width:100%;text-align:center;font-family:Montserrat,sans-serif;font-size:11px;color:var(--gray);letter-spacing:1px;text-transform:uppercase;padding:10px;background:none;border:none;cursor:pointer' onclick='continueAsGuest()'>Continue as Guest &#8594;</button>
+    </div>
+
+    <div id='ca-signin' style='display:none'>
+      <div style='font-family:Montserrat,sans-serif;font-size:13px;font-weight:800;letter-spacing:2px;text-transform:uppercase;margin-bottom:18px'>Sign In</div>
+      <form onsubmit='return caSubmitSignin(event)' style='display:flex;flex-direction:column;gap:12px'>
+        <input class='addr-inp' type='email' id='ca-signin-email' placeholder='Email address' required />
+        <input class='addr-inp' type='password' id='ca-signin-password' placeholder='Password' required />
+        <div class='error-msg' id='ca-signin-error' style='color:#c62828;font-size:11px;min-height:14px'></div>
+        <button class='btn btn-gold' type='submit' style='width:100%'>Sign In</button>
+      </form>
+      <button onclick='caShow("choice")' style='margin-top:14px;font-size:11px;color:var(--gray);background:none;border:none;cursor:pointer'>&#8592; Back</button>
+    </div>
+
+    <div id='ca-signup' style='display:none'>
+      <div style='font-family:Montserrat,sans-serif;font-size:13px;font-weight:800;letter-spacing:2px;text-transform:uppercase;margin-bottom:18px'>Create Account</div>
+      <form onsubmit='return caSubmitSignup(event)' style='display:flex;flex-direction:column;gap:12px'>
+        <input class='addr-inp' type='text' id='ca-signup-name' placeholder='Full name' required />
+        <input class='addr-inp' type='email' id='ca-signup-email' placeholder='Email address' required />
+        <input class='addr-inp' type='tel' id='ca-signup-phone' placeholder='Phone number' />
+        <input class='addr-inp' type='password' id='ca-signup-password' placeholder='Password (min 6 characters)' minlength='6' required />
+        <div class='error-msg' id='ca-signup-error' style='color:#c62828;font-size:11px;min-height:14px'></div>
+        <button class='btn btn-gold' type='submit' style='width:100%'>Create Account</button>
+      </form>
+      <button onclick='caShow("choice")' style='margin-top:14px;font-size:11px;color:var(--gray);background:none;border:none;cursor:pointer'>&#8592; Back</button>
+    </div>
+  </div>
+</div>
