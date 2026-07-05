@@ -77,7 +77,72 @@ async function handleLogin(req, res) {
       token,
       expiresInMs: TOKEN_TTL_MS,
       role: admin.role,
-      loginLogId: admin.role === 'sub_admin' ? (logEntry && logEntry.id) : null,
+      async function handleLogin(req, res) {
+  const { username, password } = req.body || {};
+
+  if (!ADMIN_SECRET) {
+    return res.status(500).json({
+      error: 'Server not configured: ADMIN_SECRET missing in Vercel environment variables.',
+    });
+  }
+
+  if (!password) {
+    await logAttempt(req, { username, success: false, reason: 'missing_password' });
+    return res.status(400).json({ error: 'Password is required.' });
+  }
+
+  if (username) {
+    const { data: admin, error } = await supabase
+      .from('admins')
+      .select('*')
+      .eq('username', username)
+      .maybeSingle();
+
+    if (error) throw error;
+    if (!admin || !verifyPassword(password, admin.password_hash)) {
+      await logAttempt(req, { username, success: false, reason: 'bad_credentials' });
+      return res.status(401).json({ error: 'Incorrect username or password.' });
+    }
+
+    const token = signToken({
+      role: admin.role,
+      username: admin.username,
+      permissions: admin.role === 'super_admin' ? FULL_PERMISSIONS : (admin.permissions || {}),
+      exp: Date.now() + TOKEN_TTL_MS,
+    });
+    const logEntry = await logAttempt(req, { username: admin.username, role: admin.role, success: true });
+    return res.status(200).json({
+      token,
+      expiresInMs: TOKEN_TTL_MS,
+      role: admin.role,
+      loginLogId: logEntry && logEntry.id, // FIX: was restricted to sub_admin only
+    });
+  }
+
+  if (!ADMIN_PASSWORD) {
+    return res.status(500).json({
+      error: 'Server not configured: ADMIN_PASSWORD missing in Vercel environment variables.',
+    });
+  }
+  if (password !== ADMIN_PASSWORD) {
+    await logAttempt(req, { username: 'owner', success: false, reason: 'bad_bootstrap_password' });
+    return res.status(401).json({ error: 'Incorrect password.' });
+  }
+
+  const token = signToken({
+    role: 'super_admin',
+    username: 'owner',
+    permissions: FULL_PERMISSIONS,
+    exp: Date.now() + TOKEN_TTL_MS,
+  });
+  const logEntry = await logAttempt(req, { username: 'owner', role: 'super_admin', success: true }); // FIX: capture result
+  return res.status(200).json({
+    token,
+    expiresInMs: TOKEN_TTL_MS,
+    role: 'super_admin',
+    loginLogId: logEntry && logEntry.id, // FIX: was missing entirely
+  });
+}
     });
   }
 
