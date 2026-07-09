@@ -144,6 +144,32 @@ async function handleDashboard(req, res) {
   });
 }
 
+async function handleLoginLogs(req, res) {
+  const session = requireAuth(req, res);
+  if (!session) return;
+
+  const { data, error } = await supabase
+    .from('admin_logins')
+    .select('created_at, ip_address, user_agent, admins ( username, role )')
+    .order('created_at', { ascending: false })
+    .limit(50);
+
+  if (error) {
+    console.error('handleLoginLogs failed:', error.message);
+    return res.status(500).json({ error: error.message });
+  }
+
+  const logins = (data || []).map((row) => ({
+    when: row.created_at,
+    username: row.admins?.username || 'unknown',
+    role: row.admins?.role || 'unknown',
+    ip_address: row.ip_address,
+    user_agent: row.user_agent,
+  }));
+
+  return res.status(200).json({ logins });
+}
+
 module.exports = async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
@@ -156,6 +182,7 @@ module.exports = async function handler(req, res) {
   try {
     if (req.method === 'POST' && action === 'login') return await handleLogin(req, res);
     if (req.method === 'GET' && action === 'dashboard') return await handleDashboard(req, res);
+    if (req.method === 'GET' && action === 'login-logs') return await handleLoginLogs(req, res);
     return res.status(400).json({ error: 'Unknown action: ' + action });
   } catch (err) {
     console.error('admin.js error:', err);
