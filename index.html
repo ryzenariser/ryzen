@@ -1102,7 +1102,7 @@ function rzpCheckout(addr){
     var order=res&&res.data;
     if(res.error||!order||!order.id){toast('Could not start checkout. Please try again.');return}
     var rzp=new Razorpay({
-      key:order.key,
+      key:order.key||"rzp_live_T8giolS4Vjj451",
       amount:order.amount,
       currency:'INR',
       name:'Ryzen',
