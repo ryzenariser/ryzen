@@ -21,18 +21,27 @@ function getClientIp(req) {
 
 // Logs every login attempt — success AND failure. adminId is null when the
 // attempt failed before we could match a real admin (bad username or wrong
-// password), so we fall back to recording whatever username was typed.
+// password). Returns the new row's id so the frontend can later attach GPS
+// coordinates to this specific login (only happens on success).
 async function logLogin(adminId, attemptedUsername, success, req) {
   try {
-    await supabase.from('admin_logins').insert({
-      admin_id: adminId,
-      attempted_username: attemptedUsername || null,
-      success,
-      ip_address: getClientIp(req),
-      user_agent: req.headers['user-agent'] || 'unknown',
-    });
+    const { data, error } = await supabase
+      .from('admin_logins')
+      .insert({
+        admin_id: adminId,
+        attempted_username: attemptedUsername || null,
+        success,
+        ip_address: getClientIp(req),
+        user_agent: req.headers['user-agent'] || 'unknown',
+      })
+      .select('id')
+      .single();
+
+    if (error) throw error;
+    return data.id;
   } catch (err) {
     console.error('logLogin failed:', err.message);
+    return null;
   }
 }
 
@@ -123,7 +132,7 @@ async function handleLogin(req, res) {
     return res.status(401).json({ error: 'This account has been deactivated.' });
   }
 
-  await logLogin(admin.id, admin.username, true, req);
+  const loginLogId = await logLogin(admin.id, admin.username, true, req);
   await sendTelegramAlert(admin, req);
 
   const token = signToken({
@@ -139,7 +148,35 @@ async function handleLogin(req, res) {
     expiresInMs: TOKEN_TTL_MS,
     role: admin.role,
     mustChangePassword: !!admin.must_change_password,
+    // The frontend uses this to optionally attach exact GPS coordinates
+    // to this login via action=update-location, if the admin grants
+    // browser location permission.
+    loginLogId,
   });
+}
+
+// Called separately by the frontend right after a successful login, only
+// if the browser's geolocation prompt was accepted. Attaches exact GPS
+// coordinates to the login row created in handleLogin. This is the only
+// way to get an EXACT location — IP address alone can only ever give an
+// approximate city/region, never a precise position.
+async function handleUpdateLocation(req, res) {
+  const session = requireAuth(req, res);
+  if (!session) return;
+
+  const { loginLogId, latitude, longitude } = req.body || {};
+  if (!loginLogId || typeof latitude !== 'number' || typeof longitude !== 'number') {
+    return res.status(400).json({ error: 'loginLogId, latitude, and longitude are required.' });
+  }
+
+  const { error } = await supabase
+    .from('admin_logins')
+    .update({ latitude, longitude })
+    .eq('id', loginLogId)
+    .eq('admin_id', session.sub); // can only update your own login row
+
+  if (error) throw error;
+  return res.status(200).json({ ok: true });
 }
 
 async function handleDashboard(req, res) {
@@ -186,7 +223,7 @@ async function handleLoginLogs(req, res) {
 
   const { data, error } = await supabase
     .from('admin_logins')
-    .select('created_at, ip_address, user_agent, success, attempted_username, admins ( username, role )')
+    .select('created_at, ip_address, user_agent, success, attempted_username, latitude, longitude, admins ( username, role )')
     .order('created_at', { ascending: false })
     .limit(50);
 
@@ -202,6 +239,8 @@ async function handleLoginLogs(req, res) {
     success: row.success,
     ip_address: row.ip_address,
     user_agent: row.user_agent,
+    latitude: row.latitude,
+    longitude: row.longitude,
   }));
 
   return res.status(200).json({ logins });
@@ -218,6 +257,7 @@ module.exports = async function handler(req, res) {
 
   try {
     if (req.method === 'POST' && action === 'login') return await handleLogin(req, res);
+    if (req.method === 'POST' && action === 'update-location') return await handleUpdateLocation(req, res);
     if (req.method === 'GET' && action === 'dashboard') return await handleDashboard(req, res);
     if (req.method === 'GET' && action === 'login-logs') return await handleLoginLogs(req, res);
     return res.status(400).json({ error: 'Unknown action: ' + action });
