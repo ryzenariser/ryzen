@@ -76,8 +76,11 @@ module.exports = async (req, res) => {
 
     if (uploadError) throw uploadError;
 
+    // Fixed: was previously writing to "login_logs" (a table nothing
+    // else uses). Real login rows live in "admin_logins" — this now
+    // matches what handleLogin() in admin.js actually inserts into.
     const { error: updateError } = await supabase
-      .from('login_logs')
+      .from('admin_logins')
       .update({ photo_path: path })
       .eq('id', loginLogId);
 
