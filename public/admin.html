@@ -9,118 +9,166 @@
 <style>
 :root{
   --gold:#C9A84C;--gold-l:#E2C27D;--gold-d:#9E7C2E;
-  --black:#0D0D0D;--dark:#111;--dark2:#1A1A1A;--panel:#161616;--line:#2a2a2a;
-  --bone:#F5F3EE;--white:#fff;--gray:#8f8b85;--danger:#c0553f;--t:.2s ease;
+  --black:#0A0A0B;--dark:#111;--dark2:#161616;
+  --bone:#F5F3EE;--white:#fff;--gray:#9a958c;--danger:#c0553f;--t:.22s ease;
+
+  /* glass */
+  --glass:rgba(255,255,255,.045);
+  --glass-hi:rgba(255,255,255,.08);
+  --glass-border:rgba(201,168,76,.16);
+  --glass-border-hi:rgba(201,168,76,.34);
+  --blur:blur(22px) saturate(150%);
+  --radius:16px;
+  --radius-sm:10px;
 }
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-body{font-family:'Inter',sans-serif;background:var(--black);color:var(--bone);min-height:100vh}
+html,body{height:100%}
+body{
+  font-family:'Inter',sans-serif;color:var(--bone);min-height:100vh;
+  background:var(--black);
+  position:relative;
+}
 h1,h2,h3{font-family:'Montserrat',sans-serif;font-weight:800;letter-spacing:.5px}
 .logo{font-family:'Playfair Display',serif;font-size:22px;font-weight:700;letter-spacing:6px;color:var(--gold);text-transform:uppercase}
 button{cursor:pointer;font-family:'Inter',sans-serif}
-input,select,textarea{font-family:'Inter',sans-serif;background:var(--dark2);border:1px solid var(--line);color:var(--bone);border-radius:3px;padding:10px 12px;font-size:13px;width:100%}
-input:focus,select:focus,textarea:focus{outline:none;border-color:var(--gold-d)}
+input,select,textarea{
+  font-family:'Inter',sans-serif;background:rgba(255,255,255,.03);
+  border:1px solid rgba(255,255,255,.09);color:var(--bone);
+  border-radius:var(--radius-sm);padding:10px 12px;font-size:13px;width:100%;
+  transition:border-color var(--t),background var(--t);
+}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--gold-d);background:rgba(255,255,255,.05)}
 label{display:block;font-size:11px;color:var(--gray);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px}
 .field{margin-bottom:16px}
-.btn{font-family:'Montserrat',sans-serif;font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;padding:11px 20px;border-radius:3px;border:2px solid transparent;transition:var(--t)}
+.btn{font-family:'Montserrat',sans-serif;font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;padding:11px 20px;border-radius:var(--radius-sm);border:2px solid transparent;transition:var(--t)}
 .btn-gold{background:var(--gold);color:var(--black)}
-.btn-gold:hover{background:var(--gold-l)}
-.btn-outline{background:transparent;border-color:var(--line);color:var(--bone)}
-.btn-outline:hover{border-color:var(--gold-d)}
+.btn-gold:hover{background:var(--gold-l);box-shadow:0 0 24px rgba(201,168,76,.35)}
+.btn-outline{background:rgba(255,255,255,.03);border-color:rgba(255,255,255,.14);color:var(--bone)}
+.btn-outline:hover{border-color:var(--gold-d);background:rgba(201,168,76,.06)}
 .btn-danger{background:transparent;border-color:var(--danger);color:var(--danger)}
 .btn-danger:hover{background:var(--danger);color:var(--white)}
 .btn-sm{padding:7px 14px;font-size:10px}
 .btn:disabled{opacity:.5;cursor:not-allowed}
 
+/* ── ambient glow (the atelier-light backdrop every glass surface sits on) ── */
+.ambient{position:fixed;inset:0;z-index:0;overflow:hidden;pointer-events:none}
+.orb{position:absolute;border-radius:50%;filter:blur(90px);opacity:.55}
+.orb-1{width:520px;height:520px;background:radial-gradient(circle,#9E7C2E,transparent 70%);top:-140px;left:-100px}
+.orb-2{width:640px;height:640px;background:radial-gradient(circle,#3a2e12,transparent 70%);bottom:-220px;right:-160px}
+.orb-3{width:420px;height:420px;background:radial-gradient(circle,#5c4a1e,transparent 70%);top:38%;left:48%}
+
+/* generic glass surface */
+.glass{
+  background:var(--glass);
+  -webkit-backdrop-filter:var(--blur);backdrop-filter:var(--blur);
+  border:1px solid var(--glass-border);
+  border-radius:var(--radius);
+  box-shadow:0 8px 32px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.05);
+  position:relative;
+}
+
 /* login */
-#login-screen{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px}
-.login-card{width:100%;max-width:380px;background:var(--panel);border:1px solid var(--line);padding:44px 34px}
+#login-screen{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;position:relative;z-index:1}
+.login-card{width:100%;max-width:380px;padding:44px 34px}
 .wordmark-sub{font-size:11px;color:var(--gray);letter-spacing:.1em;text-transform:uppercase;margin:6px 0 30px}
 .error-msg{color:var(--danger);font-size:12px;margin:-8px 0 16px;min-height:16px}
 
 /* layout */
-#app-screen{display:none}
-.layout{display:flex;min-height:100vh}
-.sidebar{width:220px;background:var(--panel);border-right:1px solid var(--line);padding:26px 0;flex-shrink:0}
+#app-screen{display:none;position:relative;z-index:1}
+.layout{display:flex;min-height:100vh;gap:16px;padding:16px}
+.sidebar{width:220px;padding:26px 0;flex-shrink:0;align-self:flex-start;position:sticky;top:16px}
 .sidebar .logo{padding:0 24px}
 .sidebar .wordmark-sub{padding:0 24px}
-.nav-item{display:flex;align-items:center;gap:8px;padding:11px 24px;font-size:12px;font-family:'Montserrat',sans-serif;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--gray);cursor:pointer;border-left:2px solid transparent}
-.nav-item.active{color:var(--bone);border-left-color:var(--gold);background:rgba(201,168,76,.06)}
-.nav-item.disabled{color:#4a4a4a;cursor:default}
-.tag{font-size:8px;background:var(--line);color:var(--gray);padding:2px 6px;border-radius:2px;margin-left:auto}
-.main{flex:1;padding:36px 44px;max-width:1100px}
+.nav-item{display:flex;align-items:center;gap:8px;padding:11px 24px;font-size:12px;font-family:'Montserrat',sans-serif;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--gray);cursor:pointer;border-left:2px solid transparent;transition:var(--t)}
+.nav-item:hover{color:var(--bone)}
+.nav-item.active{color:var(--bone);border-left-color:var(--gold);background:rgba(201,168,76,.08)}
+.nav-item.disabled{color:#565656;cursor:default}
+.nav-item.disabled:hover{color:#565656}
+.tag{font-size:8px;background:rgba(255,255,255,.08);color:var(--gray);padding:2px 6px;border-radius:4px;margin-left:auto}
+.main{flex:1;padding:20px 28px;max-width:1100px}
 .topbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:28px;flex-wrap:wrap;gap:12px}
 .topbar h1{font-size:20px}
-.link-btn{font-size:11px;color:var(--gray);background:transparent;border:1px solid var(--line);padding:8px 14px;border-radius:3px}
+.link-btn{font-size:11px;color:var(--gray);background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.1);padding:8px 14px;border-radius:var(--radius-sm)}
 .link-btn:hover{border-color:var(--gold-d);color:var(--bone)}
 
 /* dashboard */
 .stat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:30px}
-.stat-card{background:var(--panel);border:1px solid var(--line);padding:20px;border-radius:3px}
-.stat-card .num{font-family:'Montserrat',sans-serif;font-size:28px;font-weight:800;color:var(--gold)}
+.stat-card{padding:20px}
+.stat-card .num{font-family:'Montserrat',sans-serif;font-size:28px;font-weight:800;color:var(--gold);text-shadow:0 0 20px rgba(201,168,76,.3)}
 .stat-card .label{font-size:11px;color:var(--gray);text-transform:uppercase;letter-spacing:.06em;margin-top:4px}
 
 /* tables */
-.table-wrap{background:var(--panel);border:1px solid var(--line);border-radius:3px;overflow:hidden}
+.table-wrap{overflow:hidden}
 table{width:100%;border-collapse:collapse}
-th{text-align:left;font-family:'Montserrat',sans-serif;font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--gray);padding:12px 16px;border-bottom:1px solid var(--line)}
-td{padding:12px 16px;border-bottom:1px solid var(--line);font-size:13px;vertical-align:middle}
+th{text-align:left;font-family:'Montserrat',sans-serif;font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--gray);padding:12px 16px;border-bottom:1px solid rgba(255,255,255,.08)}
+td{padding:12px 16px;border-bottom:1px solid rgba(255,255,255,.06);font-size:13px;vertical-align:middle}
 tr:last-child td{border-bottom:none}
+tbody tr{transition:background var(--t)}
+tbody tr:hover{background:rgba(255,255,255,.02)}
 .row-actions{display:flex;gap:8px;justify-content:flex-end}
 .empty-state{padding:40px;text-align:center;color:var(--gray);font-size:13px}
-.section-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}
+.section-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:12px}
 
 /* modal */
-.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);display:none;align-items:flex-start;justify-content:center;padding:40px 20px;overflow-y:auto;z-index:1000}
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.55);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);display:none;align-items:flex-start;justify-content:center;padding:40px 20px;overflow-y:auto;z-index:1000}
 .modal-overlay.open{display:flex}
-.modal{background:var(--panel);border:1px solid var(--line);width:100%;max-width:520px;padding:32px}
+.modal{width:100%;max-width:520px;padding:32px}
 .modal h2{font-size:17px;margin-bottom:20px}
 .modal-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:20px}
 .row-2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
-.block-item{border:1px solid var(--line);padding:14px;margin-bottom:10px;border-radius:3px;position:relative}
+.block-item{border:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.02);padding:14px;margin-bottom:10px;border-radius:var(--radius-sm);position:relative}
 .block-item .remove-block{position:absolute;top:10px;right:10px;font-size:11px;color:var(--danger);background:none;border:none}
 
 /* debug ai */
-.sev{font-family:'Montserrat',sans-serif;font-size:9px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;padding:3px 8px;border-radius:2px;display:inline-block}
-.sev-low{background:rgba(143,139,133,.15);color:var(--gray)}
+.sev{font-family:'Montserrat',sans-serif;font-size:9px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;padding:3px 8px;border-radius:6px;display:inline-block}
+.sev-low{background:rgba(154,149,140,.15);color:var(--gray)}
 .sev-medium{background:rgba(201,168,76,.15);color:var(--gold)}
 .sev-high{background:rgba(192,85,63,.18);color:#e08267}
 .sev-critical{background:var(--danger);color:var(--white)}
-.domain-tag{font-size:9px;color:var(--gray);text-transform:uppercase;letter-spacing:.05em;border:1px solid var(--line);padding:2px 7px;border-radius:2px;display:inline-block}
+.domain-tag{font-size:9px;color:var(--gray);text-transform:uppercase;letter-spacing:.05em;border:1px solid rgba(255,255,255,.12);padding:2px 7px;border-radius:6px;display:inline-block}
 .status-pill{font-size:11px;color:var(--gray);text-transform:capitalize}
 
 /* assistant */
-#assist-bubble{position:fixed;bottom:24px;right:24px;width:54px;height:54px;border-radius:50%;background:var(--gold);color:var(--black);display:flex;align-items:center;justify-content:center;font-size:22px;border:none;box-shadow:0 6px 24px rgba(0,0,0,.5);z-index:1500}
-#assist-panel{position:fixed;bottom:90px;right:24px;width:340px;max-width:calc(100vw - 32px);height:460px;background:var(--panel);border:1px solid var(--line);border-radius:6px;display:none;flex-direction:column;z-index:1500;box-shadow:0 12px 40px rgba(0,0,0,.6)}
+#assist-bubble{position:fixed;bottom:24px;right:24px;width:54px;height:54px;border-radius:50%;background:var(--gold);color:var(--black);display:flex;align-items:center;justify-content:center;font-size:22px;border:none;box-shadow:0 6px 24px rgba(201,168,76,.4);z-index:1500}
+#assist-panel{position:fixed;bottom:90px;right:24px;width:340px;max-width:calc(100vw - 32px);height:460px;border-radius:18px;display:none;flex-direction:column;z-index:1500}
 #assist-panel.open{display:flex}
-.assist-hdr{padding:14px 16px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center}
+.assist-hdr{padding:14px 16px;border-bottom:1px solid rgba(255,255,255,.08);display:flex;justify-content:space-between;align-items:center}
 .assist-hdr strong{font-family:'Montserrat',sans-serif;font-size:12px;letter-spacing:1px;text-transform:uppercase;color:var(--gold)}
 .assist-hdr button{background:none;border:none;color:var(--gray);font-size:18px}
 .assist-msgs{flex:1;overflow-y:auto;padding:14px 16px;display:flex;flex-direction:column;gap:10px}
-.msg{font-size:12.5px;line-height:1.5;padding:9px 12px;border-radius:6px;max-width:88%}
+.msg{font-size:12.5px;line-height:1.5;padding:9px 12px;border-radius:12px;max-width:88%}
 .msg.user{background:var(--gold);color:var(--black);align-self:flex-end}
-.msg.ai{background:var(--dark2);align-self:flex-start;white-space:pre-wrap}
+.msg.ai{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.06);align-self:flex-start;white-space:pre-wrap}
 .msg.note{color:var(--gray);font-size:11px;text-align:center;align-self:center}
-.assist-input{display:flex;border-top:1px solid var(--line);padding:10px}
+.assist-input{display:flex;border-top:1px solid rgba(255,255,255,.08);padding:10px}
 .assist-input input{border:none;background:transparent;font-size:12.5px}
 .assist-input button{background:none;border:none;color:var(--gold);font-family:'Montserrat',sans-serif;font-size:11px;font-weight:700;text-transform:uppercase;padding:0 8px}
 
 @media (max-width:640px){
-  .layout{flex-direction:column}
-  .sidebar{width:100%;display:flex;overflow-x:auto;padding:14px 0}
+  .layout{flex-direction:column;padding:10px;gap:10px}
+  .sidebar{width:100%;display:flex;overflow-x:auto;padding:14px 0;position:static}
   .sidebar .logo,.sidebar .wordmark-sub{display:none}
   .nav-item{border-left:none;border-bottom:2px solid transparent;white-space:nowrap}
-  .main{padding:22px 18px}
+  .main{padding:16px 14px}
   .stat-grid{grid-template-columns:1fr}
   .row-2{grid-template-columns:1fr}
   #assist-panel{right:16px;left:16px;width:auto}
+  .orb{filter:blur(60px)}
 }
 </style>
 </head>
 <body>
 
+<!-- ambient atelier-glow backdrop that every glass panel floats over -->
+<div class="ambient">
+  <div class="orb orb-1"></div>
+  <div class="orb orb-2"></div>
+  <div class="orb orb-3"></div>
+</div>
+
 <!-- ===== LOGIN ===== -->
 <div id="login-screen">
-  <div class="login-card">
+  <div class="login-card glass">
     <div class="logo">Ryzen</div>
     <div class="wordmark-sub">Admin panel</div>
     <form id="login-form">
@@ -143,7 +191,7 @@ tr:last-child td{border-bottom:none}
 <!-- ===== APP ===== -->
 <div id="app-screen">
   <div class="layout">
-    <div class="sidebar">
+    <div class="sidebar glass">
       <div class="logo">Ryzen</div>
       <div class="wordmark-sub">Admin panel</div>
       <div class="nav-item active" data-tab="dashboard">Dashboard</div>
@@ -160,9 +208,9 @@ tr:last-child td{border-bottom:none}
       <div class="tab-view" id="tab-dashboard">
         <div class="topbar"><h1>Dashboard</h1><button class="link-btn" id="logout-btn">Log out</button></div>
         <div class="stat-grid">
-          <div class="stat-card"><div class="num" id="stat-products">—</div><div class="label">Products</div></div>
-          <div class="stat-card"><div class="num" id="stat-pages">—</div><div class="label">Pages</div></div>
-          <div class="stat-card"><div class="num" id="stat-orders">—</div><div class="label">Orders</div></div>
+          <div class="stat-card glass"><div class="num" id="stat-products">—</div><div class="label">Products</div></div>
+          <div class="stat-card glass"><div class="num" id="stat-pages">—</div><div class="label">Pages</div></div>
+          <div class="stat-card glass"><div class="num" id="stat-orders">—</div><div class="label">Orders</div></div>
         </div>
       </div>
 
@@ -173,7 +221,7 @@ tr:last-child td{border-bottom:none}
           <span style="font-size:12px;color:var(--gray)">Changes write directly to Supabase.</span>
           <button class="btn btn-gold btn-sm" id="add-product-btn">+ Add Product</button>
         </div>
-        <div class="table-wrap"><table>
+        <div class="table-wrap glass"><table>
           <thead><tr><th>Name</th><th>Category</th><th>Price</th><th>Badge</th><th></th></tr></thead>
           <tbody id="products-tbody"><tr><td colspan="5" class="empty-state">Loading…</td></tr></tbody>
         </table></div>
@@ -186,7 +234,7 @@ tr:last-child td{border-bottom:none}
           <span style="font-size:12px;color:var(--gray)">Static pages become real .html files. Dynamic pages use content blocks.</span>
           <button class="btn btn-gold btn-sm" id="add-page-btn">+ New Page</button>
         </div>
-        <div class="table-wrap"><table>
+        <div class="table-wrap glass"><table>
           <thead><tr><th>Title</th><th>Type</th><th>Slug</th><th></th></tr></thead>
           <tbody id="pages-tbody"><tr><td colspan="4" class="empty-state">Loading…</td></tr></tbody>
         </table></div>
@@ -197,12 +245,12 @@ tr:last-child td{border-bottom:none}
         <div class="topbar"><h1>Admins</h1><button class="link-btn" id="logout-btn-4">Log out</button></div>
         <div class="section-top">
           <span style="font-size:12px;color:var(--gray)">Create sub-admins and control exactly what they can see and do.</span>
-          <div style="display:flex;gap:10px">
+          <div style="display:flex;gap:10px;flex-wrap:wrap">
             <button class="btn btn-outline btn-sm" id="setup-faceid-btn">Set up Face ID on this device</button>
             <button class="btn btn-gold btn-sm" id="add-admin-btn">+ Add Sub-Admin</button>
           </div>
         </div>
-        <div class="table-wrap"><table>
+        <div class="table-wrap glass"><table>
           <thead><tr><th>Username</th><th>Role</th><th>Permissions</th><th></th></tr></thead>
           <tbody id="admins-tbody"><tr><td colspan="4" class="empty-state">Loading…</td></tr></tbody>
         </table></div>
@@ -211,9 +259,9 @@ tr:last-child td{border-bottom:none}
           <div class="section-top">
             <h2 style="font-size:15px">Login History</h2>
           </div>
-          <div class="table-wrap"><table>
+          <div class="table-wrap glass"><table>
             <thead><tr><th>When</th><th>Username</th><th>Role</th><th>IP Address</th><th>Result</th><th>Photo</th></tr></thead>
-            <tbody id="login-logs-tbody"><tr><td colspan="5" class="empty-state">Loading…</td></tr></tbody>
+            <tbody id="login-logs-tbody"><tr><td colspan="6" class="empty-state">Loading…</td></tr></tbody>
           </table></div>
         </div>
       </div>
@@ -226,7 +274,7 @@ tr:last-child td{border-bottom:none}
           <button class="btn btn-gold btn-sm" id="run-scan-btn">Run Scan</button>
         </div>
         <div id="scan-status" style="font-size:11px;color:var(--gray);margin-bottom:14px"></div>
-        <div class="table-wrap"><table>
+        <div class="table-wrap glass"><table>
           <thead><tr><th>Severity</th><th>Domain</th><th>Finding</th><th>Source</th><th>Seen</th><th>Status</th><th></th></tr></thead>
           <tbody id="debug-tbody"><tr><td colspan="7" class="empty-state">Loading…</td></tr></tbody>
         </table></div>
@@ -238,7 +286,7 @@ tr:last-child td{border-bottom:none}
               <span id="dev-ai-toggle-label" style="font-size:12px;color:var(--gray)">Loading…</span>
               <span style="position:relative;display:inline-block;width:38px;height:20px">
                 <input type="checkbox" id="dev-ai-toggle" disabled style="opacity:0;width:0;height:0" />
-                <span id="dev-ai-toggle-track" style="position:absolute;inset:0;background:#3a3a3a;border-radius:999px;transition:background .15s"></span>
+                <span id="dev-ai-toggle-track" style="position:absolute;inset:0;background:rgba(255,255,255,.12);border-radius:999px;transition:background .15s"></span>
                 <span id="dev-ai-toggle-knob" style="position:absolute;top:2px;left:2px;width:16px;height:16px;background:#fff;border-radius:50%;transition:left .15s"></span>
               </span>
             </label>
@@ -256,7 +304,7 @@ tr:last-child td{border-bottom:none}
           <div id="dev-propose-status" style="font-size:12px;color:var(--gray);margin-top:10px"></div>
 
           <div style="margin-top:24px">
-            <div class="table-wrap"><table>
+            <div class="table-wrap glass"><table>
               <thead><tr><th>When</th><th>File</th><th>Instruction</th><th>PR</th></tr></thead>
               <tbody id="dev-proposals-tbody"><tr><td colspan="4" class="empty-state">Loading…</td></tr></tbody>
             </table></div>
@@ -269,7 +317,7 @@ tr:last-child td{border-bottom:none}
 
 <!-- ===== PRODUCT MODAL ===== -->
 <div class="modal-overlay" id="product-modal">
-  <div class="modal">
+  <div class="modal glass">
     <h2 id="product-modal-title">Add Product</h2>
     <form id="product-form">
       <input type="hidden" id="p-id" />
@@ -312,7 +360,7 @@ tr:last-child td{border-bottom:none}
 
 <!-- ===== PAGE MODAL ===== -->
 <div class="modal-overlay" id="page-modal">
-  <div class="modal">
+  <div class="modal glass">
     <h2 id="page-modal-title">New Page</h2>
     <form id="page-form">
       <input type="hidden" id="pg-slug-original" />
@@ -344,7 +392,7 @@ tr:last-child td{border-bottom:none}
 
 <!-- ===== ADMIN MODAL ===== -->
 <div class="modal-overlay" id="admin-modal">
-  <div class="modal">
+  <div class="modal glass">
     <h2 id="admin-modal-title">Add Sub-Admin</h2>
     <form id="admin-form">
       <input type="hidden" id="adm-id" />
@@ -388,7 +436,7 @@ tr:last-child td{border-bottom:none}
 
 <!-- ===== AI ASSISTANT ===== -->
 <button id="assist-bubble" title="Ask the assistant">✦</button>
-<div id="assist-panel">
+<div id="assist-panel" class="glass">
   <div class="assist-hdr"><strong>Ryzen Assistant</strong><button id="assist-close">✕</button></div>
   <div class="assist-msgs" id="assist-msgs">
     <div class="msg note">Read-only helper — it can see your products &amp; pages but can't change anything itself.</div>
@@ -791,19 +839,21 @@ async function loadLoginLogs() {
   tbody.innerHTML = '<tr><td colspan="6" class="empty-state">Loading…</td></tr>';
   try {
     const data = await api('/api/admin?action=login-logs');
-    const logs = data.logs || [];
+    // api/admin.js returns { logins }, not { logs } — this was the bug that
+    // silently broke this table before.
+    const logs = data.logins || [];
     if (!logs.length) {
       tbody.innerHTML = '<tr><td colspan="6" class="empty-state">No login attempts recorded yet.</td></tr>';
       return;
     }
     tbody.innerHTML = logs.map((l) => `
       <tr>
-        <td>${new Date(l.created_at).toLocaleString()}</td>
+        <td>${new Date(l.when).toLocaleString()}</td>
         <td>${escapeHtml(l.username || '—')}</td>
         <td>${escapeHtml(l.role || '—')}</td>
         <td>${escapeHtml(l.ip_address || '—')}</td>
         <td style="color:${l.success ? 'var(--gold)' : 'var(--danger)'}">${l.success ? 'Success' : 'Failed'}</td>
-        <td>${l.photo_url ? `<a href="${l.photo_url}" target="_blank"><img src="${l.photo_url}" style="width:36px;height:36px;object-fit:cover;border-radius:3px;border:1px solid var(--line)" /></a>` : '—'}</td>
+        <td>${l.photo_url ? `<a href="${l.photo_url}" target="_blank"><img src="${l.photo_url}" style="width:36px;height:36px;object-fit:cover;border-radius:6px;border:1px solid rgba(255,255,255,.1)" /></a>` : '—'}</td>
       </tr>`).join('');
   } catch (err) {
     tbody.innerHTML = `<tr><td colspan="6" class="empty-state">${escapeHtml(err.message)}</td></tr>`;
@@ -975,7 +1025,7 @@ function renderDevAiToggle(enabled) {
   checkbox.checked = enabled;
   label.textContent = enabled ? 'Connected to Groq' : 'Disconnected';
   label.style.color = enabled ? 'var(--gold)' : 'var(--gray)';
-  track.style.background = enabled ? 'var(--gold)' : '#3a3a3a';
+  track.style.background = enabled ? 'var(--gold)' : 'rgba(255,255,255,.12)';
   knob.style.left = enabled ? '20px' : '2px';
   proposeBtn.disabled = !enabled;
   proposeBtn.title = enabled ? '' : 'Switch on Developer AI above to enable this.';
