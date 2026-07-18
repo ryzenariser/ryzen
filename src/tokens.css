@@ -1,0 +1,162 @@
+/* Ryzen premium motion toolkit — design tokens
+   Locked to the mandated palette. Do not introduce new hues;
+   only tints/shades of these five are allowed. */
+
+:root {
+  --ryzen-black: #0f0f0f;
+  --ryzen-gold: #c8a64b;
+  --ryzen-white: #ffffff;
+  --ryzen-grey: #f5f5f5;
+  --ryzen-charcoal: #2b2b2b;
+
+  /* derived shades — expansions of the mandated palette, not new colors */
+  --ryzen-gold-soft: #c8a64b26;      /* 15% gold, for glows/borders */
+  --ryzen-gold-dim: #a88a3d;
+  --ryzen-black-glass: #0f0f0fcc;    /* navbar glass base */
+  --ryzen-white-glass: #ffffffb3;
+
+  --ryzen-radius: 4px;
+  --ryzen-ease-premium: cubic-bezier(0.16, 1, 0.3, 1); /* signature "expo out" easing */
+  --ryzen-duration-fast: 200ms;
+  --ryzen-duration-base: 500ms;
+  --ryzen-duration-slow: 900ms;
+}
+
+/* ---------- Glassmorphism ---------- */
+.ryzen-glass {
+  background: var(--ryzen-black-glass);
+  backdrop-filter: blur(16px) saturate(160%);
+  -webkit-backdrop-filter: blur(16px) saturate(160%);
+  border: 1px solid var(--ryzen-gold-soft);
+}
+.ryzen-glass-light {
+  background: var(--ryzen-white-glass);
+  backdrop-filter: blur(16px) saturate(160%);
+  -webkit-backdrop-filter: blur(16px) saturate(160%);
+  border: 1px solid #0f0f0f14;
+}
+
+/* ---------- GPU-accelerated base for anything animated ---------- */
+.ryzen-anim-layer {
+  will-change: transform, opacity;
+  transform: translateZ(0);
+  backface-visibility: hidden;
+}
+
+/* ---------- Reveal-on-scroll (paired with <Reveal> component) ---------- */
+.ryzen-reveal {
+  opacity: 0;
+  transform: translateY(24px);
+  transition: opacity var(--ryzen-duration-slow) var(--ryzen-ease-premium),
+    transform var(--ryzen-duration-slow) var(--ryzen-ease-premium);
+}
+.ryzen-reveal.is-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+@media (prefers-reduced-motion: reduce) {
+  .ryzen-reveal {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+}
+
+/* ---------- Magnetic / premium button ---------- */
+.ryzen-btn-premium {
+  position: relative;
+  overflow: hidden;
+  transform: translateZ(0);
+  transition: transform var(--ryzen-duration-fast) var(--ryzen-ease-premium),
+    box-shadow var(--ryzen-duration-fast) var(--ryzen-ease-premium);
+}
+.ryzen-btn-premium:hover {
+  box-shadow: 0 8px 30px var(--ryzen-gold-soft);
+}
+.ryzen-btn-premium::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(120deg, transparent, var(--ryzen-gold-soft), transparent);
+  transform: translateX(-100%);
+  transition: transform var(--ryzen-duration-slow) var(--ryzen-ease-premium);
+}
+.ryzen-btn-premium:hover::after {
+  transform: translateX(100%);
+}
+
+/* ---------- Product image hover zoom ---------- */
+.ryzen-zoom-frame {
+  overflow: hidden;
+  border-radius: var(--ryzen-radius);
+}
+.ryzen-zoom-frame img {
+  transform: scale(1);
+  transition: transform var(--ryzen-duration-slow) var(--ryzen-ease-premium);
+  will-change: transform;
+}
+.ryzen-zoom-frame:hover img {
+  transform: scale(1.08);
+}
+
+/* ---------- Card lift ---------- */
+.ryzen-card-premium {
+  transition: transform var(--ryzen-duration-base) var(--ryzen-ease-premium),
+    box-shadow var(--ryzen-duration-base) var(--ryzen-ease-premium);
+}
+.ryzen-card-premium:hover {
+  transform: translateY(-6px);
+  box-shadow: 0 20px 40px #0f0f0f1f;
+}
+
+/* ---------- Floating gradient background blob ---------- */
+.ryzen-float-gradient {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(80px);
+  opacity: 0.35;
+  background: radial-gradient(circle, var(--ryzen-gold) 0%, transparent 70%);
+  animation: ryzen-float 12s ease-in-out infinite;
+  pointer-events: none;
+}
+@keyframes ryzen-float {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(30px, -40px) scale(1.1); }
+}
+
+/* ---------- Cursor spotlight (paired with <CursorSpotlight>) ---------- */
+.ryzen-spotlight-wrap {
+  position: relative;
+  isolation: isolate;
+}
+.ryzen-spotlight-wrap::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background: radial-gradient(
+    var(--spot-size, 500px) circle at var(--spot-x, 50%) var(--spot-y, 50%),
+    var(--ryzen-gold-soft),
+    transparent 70%
+  );
+  opacity: 0;
+  transition: opacity var(--ryzen-duration-fast) ease;
+}
+.ryzen-spotlight-wrap:hover::before {
+  opacity: 1;
+}
+
+/* ---------- Sticky navbar states (paired with useScrollNavbar) ---------- */
+.ryzen-navbar {
+  transition: background-color var(--ryzen-duration-base) var(--ryzen-ease-premium),
+    backdrop-filter var(--ryzen-duration-base) var(--ryzen-ease-premium),
+    box-shadow var(--ryzen-duration-base) var(--ryzen-ease-premium);
+  background-color: transparent;
+}
+.ryzen-navbar.is-scrolled {
+  background-color: var(--ryzen-black-glass);
+  backdrop-filter: blur(14px) saturate(160%);
+  -webkit-backdrop-filter: blur(14px) saturate(160%);
+  box-shadow: 0 4px 24px #0000001a;
+}
