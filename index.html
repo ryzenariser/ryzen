@@ -36,6 +36,8 @@
 </script>
 <!-- ── end SEO essentials ── -->
 
+<link rel='preconnect' href='https://fonts.googleapis.com'/>
+<link rel='preconnect' href='https://fonts.gstatic.com' crossorigin/>
 <link href='https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;1,700&amp;family=Montserrat:wght@400;500;600;700;800;900&amp;family=Inter:wght@300;400;500&amp;display=swap' rel='stylesheet'/>
 <style>
 :root{
@@ -520,8 +522,70 @@ body{-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
 .acct-link:hover{background:rgba(201,168,76,.08);color:var(--gold);padding-left:22px}
 .acct-divider{height:1px;background:rgba(0,0,0,.06);margin:6px 0}
 </style>
+
+<!-- ══════════════════════════════════════════════════════════════════
+     INTERACTION SPEED — additive only. Quick View, Size Guide, the
+     Address modal, and Search previously just snapped open/closed via
+     display:none/flex with zero transition. This gives them a fast
+     fade+scale open, tightens the cart/wishlist drawers (accidentally
+     slowed to .5s earlier), and gives mobile nav a slide instead of an
+     instant swap. No JS changes needed — same .open class toggles. ══════ -->
+<style>
+#qv,#sg,#addr,#srch{
+  display:flex !important;
+  opacity:0;
+  visibility:hidden;
+  pointer-events:none;
+  transition:opacity .26s var(--ease,ease),visibility .26s;
+}
+#qv.open,#sg.open,#addr.open,#srch.open{
+  opacity:1;
+  visibility:visible;
+  pointer-events:auto;
+}
+#qv .qv-box,#sg .sg-box,#addr .addr-box{
+  transform:scale(.96);
+  transition:transform .26s var(--ease,ease);
+}
+#qv.open .qv-box,#sg.open .sg-box,#addr.open .addr-box{
+  transform:scale(1);
+}
+#mnav{
+  display:flex !important;
+  transform:translateY(-100%);
+  opacity:1;
+  visibility:hidden;
+  transition:transform .35s var(--ease,ease),visibility .35s;
+}
+#mnav.open{
+  transform:translateY(0);
+  visibility:visible;
+}
+#cart-sb,#wl-sb{
+  transition:right .32s cubic-bezier(.4,0,.2,1) !important;
+}
+</style>
 </head>
 <body>
+
+<!-- PREMIUM LOADING SCREEN — additive, fades out on DOMContentLoaded + hard
+     fallback timer (never waits on window.load / external fonts/images,
+     which can hang and leave this stuck on screen). -->
+<div id='ryzen-loader' style='position:fixed;inset:0;z-index:99999;background:var(--black);display:flex;align-items:center;justify-content:center;transition:opacity .5s ease,visibility .5s'>
+  <span style='font-family:"Playfair Display",serif;color:var(--gold);font-size:1.8rem;letter-spacing:.35em;animation:ryzenLoaderPulse 1.3s ease-in-out infinite'>RYZEN</span>
+</div>
+<style>
+@keyframes ryzenLoaderPulse{0%,100%{opacity:.35;letter-spacing:.3em}50%{opacity:1;letter-spacing:.4em}}
+#ryzen-loader.hide{opacity:0;visibility:hidden;pointer-events:none}
+</style>
+<script>
+(function(){
+  function hideLoader(){var l=document.getElementById('ryzen-loader');if(l)l.classList.add('hide')}
+  document.addEventListener('DOMContentLoaded',function(){setTimeout(hideLoader,600)});
+  setTimeout(hideLoader,1800); // hard fallback regardless of fonts/images/DOMContentLoaded timing
+})();
+</script>
+
 
 <!-- ANN BAR -->
 <div id='ann'>
@@ -598,7 +662,8 @@ body{-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
 <div id='srch'>
   <button class='srch-x' onclick='closeSearch()'>✕</button>
   <div class='srch-wrap'>
-    <input type='text' placeholder='Search products, materials, silhouettes...' onkeydown='if(event.key==="Enter")alert("Searching: "+this.value)'/>
+    <input type='text' id='srch-input' placeholder='Search products, materials, silhouettes...' oninput='liveSearchPreview()' onkeydown='if(event.key==="Enter")runSiteSearch()'/>
+    <div id='srch-results' style='margin-top:18px;max-height:50vh;overflow-y:auto'></div>
   </div>
 </div>
 
@@ -684,7 +749,7 @@ body{-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
 <!-- FEATURED BANNER -->
 <div style='padding:0 40px 72px;max-width:1400px;margin:0 auto'>
   <div id='feat'>
-    <div class='feat-bg'><img alt='Signature Collection' src='https://images.pexels.com/photos/6250760/pexels-photo-6250760.jpeg?auto=compress&cs=tinysrgb&w=1600&q=80'/></div>
+    <div class='feat-bg'><img alt='Signature Collection' loading='lazy' src='https://images.pexels.com/photos/6250760/pexels-photo-6250760.jpeg?auto=compress&cs=tinysrgb&w=1600&q=80'/></div>
     <div class='feat-txt'>
       <p class='feat-tag'>Limited Drop — Season 1</p>
       <h2 class='feat-h'>The Signature Collection</h2>
@@ -703,7 +768,7 @@ body{-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
     <button class='btn btn-ow' onclick='openAuth()'>Our Story &rarr;</button>
   </div>
   <div class='about-img'>
-    <img alt='About Ryzen' src='https://images.pexels.com/photos/29138677/pexels-photo-29138677.jpeg?auto=compress&cs=tinysrgb&w=1200&q=80'/>
+    <img alt='About Ryzen' loading='lazy' src='https://images.pexels.com/photos/29138677/pexels-photo-29138677.jpeg?auto=compress&cs=tinysrgb&w=1200&q=80'/>
     <div class='abadge'>
       <div class='cr'>&#9819;</div>
       <div class='tg'>Premium Design<br/>Exclusive You</div>
@@ -898,8 +963,7 @@ body{-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
 <!-- TOAST -->
 <div id='toast'></div>
 
-<!-- Razorpay -->
-<script src='https://checkout.razorpay.com/v1/checkout.js'></script>
+<!-- Razorpay is now lazy-loaded only when checkout actually starts (see loadRazorpayScript() in rzpCheckout) instead of blocking every page load. -->
 
 <!-- REACT ROOT (for AuthFlow component) -->
 <div id='root'></div>
@@ -922,6 +986,56 @@ body{-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
 function scrollTo(sel){var el=document.querySelector(sel);el&&el.scrollIntoView({behavior:'smooth'})}
 function openSearch(){document.getElementById('srch').classList.add('open')}
 function closeSearch(){document.getElementById('srch').classList.remove('open')}
+function matchesQuery(card,q){
+  var name=(card.dataset.name||'').toLowerCase();
+  var cat=(card.dataset.cat||'').toLowerCase();
+  var desc=(card.dataset.desc||'').toLowerCase();
+  var label=(card.dataset.label||'').toLowerCase();
+  return name.indexOf(q)>-1||cat.indexOf(q)>-1||desc.indexOf(q)>-1||label.indexOf(q)>-1;
+}
+function liveSearchPreview(){
+  var q=(document.getElementById('srch-input').value||'').trim().toLowerCase();
+  var box=document.getElementById('srch-results');
+  if(!q){box.innerHTML='';return}
+  var cards=Array.prototype.slice.call(document.querySelectorAll('#pgrid .pc'));
+  var matches=cards.filter(function(c){return matchesQuery(c,q)});
+  if(!matches.length){
+    box.innerHTML='<p style="color:rgba(255,255,255,.5);font-family:\'Montserrat\',sans-serif;font-size:11px;letter-spacing:1px">No products match "'+escAttr(q)+'"</p>';
+    return;
+  }
+  box.innerHTML=matches.slice(0,6).map(function(c){
+    var name=c.dataset.name;
+    var price=+c.dataset.price;
+    var img=c.querySelector('img')?c.querySelector('img').src:'';
+    return '<div onclick="jumpToProduct(\''+escAttr(name)+'\')" style="display:flex;gap:12px;align-items:center;padding:10px 0;border-bottom:1px solid rgba(255,255,255,.1);cursor:pointer">'+
+      '<img src="'+img+'" alt="'+escAttr(name)+'" style="width:44px;height:56px;object-fit:cover;flex-shrink:0"/>'+
+      '<div><div style="color:#fff;font-family:\'Montserrat\',sans-serif;font-size:12px;font-weight:600">'+name+'</div>'+
+      '<div style="color:var(--gold);font-family:\'Montserrat\',sans-serif;font-size:11px;margin-top:2px">₹'+price.toLocaleString('en-IN')+'</div></div>'+
+    '</div>';
+  }).join('');
+}
+function jumpToProduct(name){
+  closeSearch();
+  filterCat(document.querySelector('.ftab'),'all');
+  scrollTo('#shop');
+  var card=Array.prototype.slice.call(document.querySelectorAll('#pgrid .pc')).find(function(c){return c.dataset.name===name});
+  if(card)setTimeout(function(){openQV(card)},400);
+}
+function runSiteSearch(){
+  var q=(document.getElementById('srch-input').value||'').trim().toLowerCase();
+  if(!q)return;
+  closeSearch();
+  var cards=Array.prototype.slice.call(document.querySelectorAll('#pgrid .pc'));
+  var matchCount=0;
+  cards.forEach(function(c){
+    var isMatch=matchesQuery(c,q);
+    c.style.display=isMatch?'':'none';
+    if(isMatch)matchCount++;
+  });
+  document.querySelectorAll('.ftab').forEach(function(t){t.classList.remove('on')});
+  scrollTo('#shop');
+  if(!matchCount)toast('No products found for "'+q+'"');
+}
 function openMobNav(){document.getElementById('mnav').classList.add('open')}
 function closeMobNav(){document.getElementById('mnav').classList.remove('open')}
 function openAuth(){
@@ -1294,8 +1408,23 @@ function submitAddr(){
 }
 
 /* ── RAZORPAY ORDER CHECKOUT ── */
+var razorpayLoadPromise=null;
+function loadRazorpayScript(){
+  if(window.Razorpay)return Promise.resolve();
+  if(razorpayLoadPromise)return razorpayLoadPromise;
+  razorpayLoadPromise=new Promise(function(resolve,reject){
+    var s=document.createElement('script');
+    s.src='https://checkout.razorpay.com/v1/checkout.js';
+    s.onload=resolve;
+    s.onerror=reject;
+    document.body.appendChild(s);
+  });
+  return razorpayLoadPromise;
+}
 function rzpCheckout(addr){
   if(!window.supabaseClient){toast('Checkout is temporarily unavailable. Please try again shortly.');return}
+  loadRazorpayScript().catch(function(){toast('Could not load payment gateway. Check your connection and try again.');}).then(function(){
+  if(!window.Razorpay)return;
   var sub=cartSubtotal();
   var disc=coupon?Math.round(sub*coupon.pct/100):0;
   var total=sub-disc;
@@ -1328,6 +1457,7 @@ function rzpCheckout(addr){
     rzp.on('payment.failed',function(){toast('Payment failed. Please try again.')});
     rzp.open();
   }).catch(function(){toast('Could not start checkout. Please try again.')});
+  });
 }
 
 /* ── TOAST ── */
@@ -1742,58 +1872,4 @@ function filterCat(tab,cat){
   // its default screen, which still works, just not on the exact tab.
   window.acctNav = function(step){
     window.closeAcctMenu();
-    window.dispatchEvent(new CustomEvent('ryzen:open-auth', { detail:{ step: step } }));
-  };
-
-  window.acctAuthAction = function(){
-    window.closeAcctMenu();
-    getUserId().then(function(uid){
-      if(uid && window.supabaseClient){
-        window.supabaseClient.auth.signOut().then(function(){
-          toast('Signed out');
-          refreshAcctGreeting(null);
-        });
-      }else{
-        openAuth();
-      }
-    });
-  };
-
-  function refreshAcctGreeting(session){
-    var greet = document.getElementById('acct-greet');
-    var sub = document.getElementById('acct-greet-sub');
-    var action = document.getElementById('acct-auth-action');
-    if(session && session.user){
-      var label = session.user.user_metadata && session.user.user_metadata.full_name
-        ? session.user.user_metadata.full_name
-        : (session.user.email || 'Member');
-      greet.childNodes[0].textContent = 'Hello, ' + label;
-      sub.textContent = 'Manage your account below';
-      action.textContent = 'Sign Out';
-    }else{
-      greet.childNodes[0].textContent = 'Hello, Guest';
-      sub.textContent = 'Sign in for order history & membership';
-      action.textContent = 'Sign In';
-    }
-  }
-
-  function initAcctGreeting(){
-    if(!window.supabaseClient) return;
-    window.supabaseClient.auth.getSession().then(function(res){
-      refreshAcctGreeting(res && res.data && res.data.session);
-    });
-    window.supabaseClient.auth.onAuthStateChange(function(event, session){
-      if(event === 'SIGNED_IN') refreshAcctGreeting(session);
-      if(event === 'SIGNED_OUT') refreshAcctGreeting(null);
-    });
-  }
-
-  if(document.readyState === 'loading'){
-    document.addEventListener('DOMContentLoaded', initAcctGreeting);
-  }else{
-    initAcctGreeting();
-  }
-})();
-</script>
-</body>
-</html>
+    window.di
