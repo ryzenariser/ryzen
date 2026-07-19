@@ -118,7 +118,7 @@ button{cursor:pointer;border:none;background:none;font-family:inherit}
 .hero-h1 em{font-style:italic;font-family:'Playfair Display',serif;color:var(--gold)}
 .hero-sub{font-size:14px;color:rgba(255,255,255,.6);line-height:1.8;margin-bottom:44px;max-width:380px}
 .hero-btns{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:48px}
-.hero-stats{display:flex;gap:36px}
+.hero-stats{display:flex;gap:36px;flex-wrap:wrap}
 .snum{font-family:'Montserrat',sans-serif;font-size:22px;font-weight:800;color:var(--gold)}
 .slbl{font-size:9px;color:rgba(255,255,255,.4);letter-spacing:2px;text-transform:uppercase;font-family:'Montserrat',sans-serif;margin-top:3px}
 .hero-r{flex:1;position:relative;overflow:hidden}
@@ -187,6 +187,7 @@ button{cursor:pointer;border:none;background:none;font-family:inherit}
 @media(max-width:480px){
   #pgrid{grid-template-columns:1fr}
   .hero-l{padding:30px 16px}
+  .hero-stats{gap:20px}
 }
 
 /* ── MERGED FROM PRIOR VERSION ── */
@@ -607,11 +608,11 @@ body{-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
 <div id='ann'>
   <div class='msg'>FLAT 15% OFF YOUR FIRST ORDER — USE CODE: RYZEN15</div>
   <div class='links'>
-    <a href='#'>Track Order</a>
+    <a href='https://wa.me/919XXXXXXXXX?text=Hi%2C%20I%27d%20like%20to%20track%20my%20order' target='_blank' rel='noopener'>Track Order</a>
     <span class='sep'>|</span>
-    <a href='#'>Help</a>
+    <a href='https://wa.me/919XXXXXXXXX?text=Hi%2C%20I%20need%20help%20with' target='_blank' rel='noopener'>Help</a>
     <span class='sep'>|</span>
-    <a href='#'>Contact</a>
+    <a href='https://wa.me/919XXXXXXXXX' target='_blank' rel='noopener'>Contact</a>
     <span class='sep'>|</span>
     <a href='https://wa.me/919XXXXXXXXX' target='_blank' rel='noopener'>&#128232; WhatsApp</a>
   </div>
@@ -624,15 +625,15 @@ body{-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
     <nav class='nav'>
       <a href='#shop'>Shop</a>
       <div class='nav-dd'>
-        <a href='#' class='nav-t'>Collections</a>
+        <a href='#shop' class='nav-t'>Collections</a>
         <div class='dd'>
-          <a href='#'>New Arrivals</a>
-          <a href='#'>Best Sellers</a>
-          <a href='#'>Limited Edition</a>
+          <a href='#' onclick='filterByBadge("new");return false'>New Arrivals</a>
+          <a href='#' onclick='filterByBadge("limited");return false'>Best Sellers</a>
+          <a href='#' onclick='filterByBadge("limited");return false'>Limited Edition</a>
         </div>
       </div>
-      <a href='#'>About</a>
-      <a href='#'>Journal</a>
+      <a href='#about'>About</a>
+      <a href='#' onclick='toast("Journal coming soon");return false'>Journal</a>
     </nav>
     <div class='hdr-icons'>
       <button class='hico' onclick='openSearch()' style='font-size:19px;line-height:1'>⌕</button>
@@ -668,10 +669,10 @@ body{-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
 <nav id='mnav'>
   <button class='mnav-x' onclick='closeMobNav()'>✕</button>
   <a href='#shop'>Shop</a>
-  <a href='#'>New Arrivals</a>
-  <a href='#'>Collections</a>
-  <a href='#'>About</a>
-  <a href='#'>Journal</a>
+  <a href='#' onclick='filterByBadge("new");closeMobNav();return false'>New Arrivals</a>
+  <a href='#shop' onclick='closeMobNav()'>Collections</a>
+  <a href='#about' onclick='closeMobNav()'>About</a>
+  <a href='#' onclick='toast("Journal coming soon");closeMobNav();return false'>Journal</a>
 </nav>
 
 <!-- SEARCH -->
@@ -695,12 +696,16 @@ body{-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
     </div>
     <div class='hero-stats'>
       <div>
-        <div class='snum'>500+</div>
+        <div class='snum'>500k+</div>
         <div class='slbl'>Happy Customers</div>
       </div>
       <div>
-        <div class='snum'>99%</div>
-        <div class='slbl'>Satisfaction</div>
+        <div class='snum'>4.9&#9733;</div>
+        <div class='slbl'>Customer Rating</div>
+      </div>
+      <div>
+        <div class='snum'>100%</div>
+        <div class='slbl'>Premium Fabrics</div>
       </div>
     </div>
   </div>
@@ -816,24 +821,24 @@ body{-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
     </div>
     <div>
       <div style='font-weight:700;margin-bottom:12px;text-transform:uppercase;font-family:"Montserrat",sans-serif;font-size:11px;letter-spacing:2px;color:var(--white)'>Shop</div>
-      <a href='#' style='display:block;margin-bottom:8px;color:rgba(245,243,238,.7);transition:color .2s' onmouseover="this.style.color='var(--gold)'" onmouseout="this.style.color='rgba(245,243,238,.7)'">New Arrivals</a>
-      <a href='#' style='display:block;margin-bottom:8px;color:rgba(245,243,238,.7);transition:color .2s' onmouseover="this.style.color='var(--gold)'" onmouseout="this.style.color='rgba(245,243,238,.7)'">All Products</a>
-      <a href='#' style='display:block;margin-bottom:8px;color:rgba(245,243,238,.7);transition:color .2s' onmouseover="this.style.color='var(--gold)'" onmouseout="this.style.color='rgba(245,243,238,.7)'">Collections</a>
+      <a href='#' onclick='filterByBadge("new");return false' style='display:block;margin-bottom:8px;color:rgba(245,243,238,.7);transition:color .2s' onmouseover="this.style.color='var(--gold)'" onmouseout="this.style.color='rgba(245,243,238,.7)'">New Arrivals</a>
+      <a href='#shop' style='display:block;margin-bottom:8px;color:rgba(245,243,238,.7);transition:color .2s' onmouseover="this.style.color='var(--gold)'" onmouseout="this.style.color='rgba(245,243,238,.7)'">All Products</a>
+      <a href='#shop' style='display:block;margin-bottom:8px;color:rgba(245,243,238,.7);transition:color .2s' onmouseover="this.style.color='var(--gold)'" onmouseout="this.style.color='rgba(245,243,238,.7)'">Collections</a>
     </div>
     <div>
       <div style='font-weight:700;margin-bottom:12px;text-transform:uppercase;font-family:"Montserrat",sans-serif;font-size:11px;letter-spacing:2px;color:var(--white)'>Support</div>
-      <a href='#' style='display:block;margin-bottom:8px;color:rgba(245,243,238,.7);transition:color .2s' onmouseover="this.style.color='var(--gold)'" onmouseout="this.style.color='rgba(245,243,238,.7)'">Contact Us</a>
-      <a href='#' style='display:block;margin-bottom:8px;color:rgba(245,243,238,.7);transition:color .2s' onmouseover="this.style.color='var(--gold)'" onmouseout="this.style.color='rgba(245,243,238,.7)'">Track Order</a>
+      <a href='https://wa.me/919XXXXXXXXX' target='_blank' rel='noopener' style='display:block;margin-bottom:8px;color:rgba(245,243,238,.7);transition:color .2s' onmouseover="this.style.color='var(--gold)'" onmouseout="this.style.color='rgba(245,243,238,.7)'">Contact Us</a>
+      <a href='https://wa.me/919XXXXXXXXX?text=Hi%2C%20I%27d%20like%20to%20track%20my%20order' target='_blank' rel='noopener' style='display:block;margin-bottom:8px;color:rgba(245,243,238,.7);transition:color .2s' onmouseover="this.style.color='var(--gold)'" onmouseout="this.style.color='rgba(245,243,238,.7)'">Track Order</a>
       <a href='#' onclick='openSG();return false' style='display:block;margin-bottom:8px;color:rgba(245,243,238,.7);transition:color .2s' onmouseover="this.style.color='var(--gold)'" onmouseout="this.style.color='rgba(245,243,238,.7)'">Size Guide</a>
-      <a href='#' style='display:block;margin-bottom:8px;color:rgba(245,243,238,.7);transition:color .2s' onmouseover="this.style.color='var(--gold)'" onmouseout="this.style.color='rgba(245,243,238,.7)'">Shipping Info</a>
-      <a href='#' style='display:block;margin-bottom:8px;color:rgba(245,243,238,.7);transition:color .2s' onmouseover="this.style.color='var(--gold)'" onmouseout="this.style.color='rgba(245,243,238,.7)'">Returns</a>
-      <a href='#' style='display:block;margin-bottom:8px;color:rgba(245,243,238,.7);transition:color .2s' onmouseover="this.style.color='var(--gold)'" onmouseout="this.style.color='rgba(245,243,238,.7)'">FAQ</a>
+      <a href='#' onclick='toast("Shipping info coming soon");return false' style='display:block;margin-bottom:8px;color:rgba(245,243,238,.7);transition:color .2s' onmouseover="this.style.color='var(--gold)'" onmouseout="this.style.color='rgba(245,243,238,.7)'">Shipping Info</a>
+      <a href='#' onclick='toast("Returns policy coming soon");return false' style='display:block;margin-bottom:8px;color:rgba(245,243,238,.7);transition:color .2s' onmouseover="this.style.color='var(--gold)'" onmouseout="this.style.color='rgba(245,243,238,.7)'">Returns</a>
+      <a href='#' onclick='toast("FAQ coming soon");return false' style='display:block;margin-bottom:8px;color:rgba(245,243,238,.7);transition:color .2s' onmouseover="this.style.color='var(--gold)'" onmouseout="this.style.color='rgba(245,243,238,.7)'">FAQ</a>
     </div>
     <div>
       <div style='font-weight:700;margin-bottom:12px;text-transform:uppercase;font-family:"Montserrat",sans-serif;font-size:11px;letter-spacing:2px;color:var(--white)'>Company</div>
-      <a href='#' style='display:block;margin-bottom:8px;color:rgba(245,243,238,.7);transition:color .2s' onmouseover="this.style.color='var(--gold)'" onmouseout="this.style.color='rgba(245,243,238,.7)'">About</a>
-      <a href='#' style='display:block;margin-bottom:8px;color:rgba(245,243,238,.7);transition:color .2s' onmouseover="this.style.color='var(--gold)'" onmouseout="this.style.color='rgba(245,243,238,.7)'">Journal</a>
-      <a href='#' style='display:block;margin-bottom:8px;color:rgba(245,243,238,.7);transition:color .2s' onmouseover="this.style.color='var(--gold)'" onmouseout="this.style.color='rgba(245,243,238,.7)'">Privacy</a>
+      <a href='#about' style='display:block;margin-bottom:8px;color:rgba(245,243,238,.7);transition:color .2s' onmouseover="this.style.color='var(--gold)'" onmouseout="this.style.color='rgba(245,243,238,.7)'">About</a>
+      <a href='#' onclick='toast("Journal coming soon");return false' style='display:block;margin-bottom:8px;color:rgba(245,243,238,.7);transition:color .2s' onmouseover="this.style.color='var(--gold)'" onmouseout="this.style.color='rgba(245,243,238,.7)'">Journal</a>
+      <a href='#' onclick='toast("Privacy policy coming soon");return false' style='display:block;margin-bottom:8px;color:rgba(245,243,238,.7);transition:color .2s' onmouseover="this.style.color='var(--gold)'" onmouseout="this.style.color='rgba(245,243,238,.7)'">Privacy</a>
     </div>
   </div>
   <div style='border-top:1px solid rgba(201,168,76,.2);padding-top:24px;text-align:center;color:rgba(245,243,238,.5);font-family:"Montserrat",sans-serif;font-size:10px;letter-spacing:1px'>
@@ -1654,6 +1659,20 @@ function filterCat(tab,cat){
     }
   });
 }
+/* Used by nav/footer links (New Arrivals, Limited Edition) — filters the
+   grid by product badge instead of category, then scrolls to it. */
+function filterByBadge(badge){
+  document.querySelectorAll('.ftab').forEach(function(t){t.classList.remove('on')});
+  var cards=document.querySelectorAll('.pc');
+  var found=false;
+  cards.forEach(function(c){
+    var match=c.querySelector('.pbadge.b-'+badge);
+    c.style.display=match?'':'none';
+    if(match)found=true;
+  });
+  scrollTo('#shop');
+  if(!found)toast('No products in this collection yet');
+}
 
 /* ── ERROR MONITORING ── */
 (function(){
@@ -1813,139 +1832,4 @@ function filterCat(tab,cat){
           mesh.rotation.x += dt * 0.18;
           mesh.rotation.y += dt * 0.26;
           wireMesh.rotation.x -= dt * 0.10;
-          wireMesh.rotation.y -= dt * 0.16;
-          renderer.render(scene, camera);
-        }
-        animate();
-        mount.classList.add('ready');
-
-        function pause(){ if(raf){ cancelAnimationFrame(raf); raf = null; } }
-        function resume(){ if(!raf && visible && document.visibilityState === 'visible'){ animate(); } }
-
-        document.addEventListener('visibilitychange', function(){
-          if(document.visibilityState === 'hidden') pause(); else resume();
-        });
-
-        if('IntersectionObserver' in window){
-          var vio = new IntersectionObserver(function(entries){
-            entries.forEach(function(e){
-              visible = e.isIntersecting;
-              if(!visible) pause(); else resume();
-            });
-          }, { threshold: 0 });
-          vio.observe(mount);
-        }
-
-        function onResize(){
-          var w = mount.clientWidth || mount.parentElement.clientWidth;
-          var h = mount.clientHeight || mount.parentElement.clientHeight;
-          if(!w || !h) return;
-          camera.aspect = w/h; camera.updateProjectionMatrix();
-          renderer.setSize(w, h);
-        }
-        window.addEventListener('resize', onResize);
-      })
-      .catch(function(){ /* Three.js failed to load (offline/CDN blocked) — hero image placeholder remains as-is */ });
-  }
-
-  function init(){
-    initReveal();
-    initBadgeBump();
-    initHero3D();
-  }
-
-  if(document.readyState === 'loading'){
-    document.addEventListener('DOMContentLoaded', init);
-  } else {
-    init();
-  }
-})();
-</script>
-
-<!-- ══════════════════════════════════════════════════════════════════
-     ACCOUNT DROPDOWN — additive script only. Reuses the existing
-     getUserId()/window.supabaseClient/openAuth() already defined above;
-     doesn't touch cart, wishlist, or checkout logic. ══════ -->
-<script>
-(function(){
-  "use strict";
-
-  window.toggleAcctMenu = function(e){
-    if(e) e.stopPropagation();
-    document.getElementById('acct-dd').classList.toggle('open');
-  };
-  window.closeAcctMenu = function(){
-    document.getElementById('acct-dd').classList.remove('open');
-  };
-  document.addEventListener('click', function(e){
-    var wrap = document.querySelector('.acct-wrap');
-    if(wrap && !wrap.contains(e.target)) window.closeAcctMenu();
-  });
-  document.addEventListener('keydown', function(e){
-    if(e.key === 'Escape') window.closeAcctMenu();
-  });
-
-  // "My Profile" / "Your Orders" / "Your Addresses" / "Membership" all open
-  // the existing AuthFlow overlay via the same ryzen:open-auth event already
-  // used elsewhere on this page, passing a `step` hint in detail.
-  // NOTE: AuthFlow.jsx needs to read event.detail.step to deep-link into
-  // its matching screen (it already has profile/addresses/membership
-  // sub-screens per your setup) — if it doesn't yet, it will just open to
-  // its default screen, which still works, just not on the exact tab.
-  window.acctNav = function(step){
-    window.closeAcctMenu();
-    window.dispatchEvent(new CustomEvent('ryzen:open-auth', { detail:{ step: step } }));
-  };
-
-  window.acctAuthAction = function(){
-    window.closeAcctMenu();
-    getUserId().then(function(uid){
-      if(uid && window.supabaseClient){
-        window.supabaseClient.auth.signOut().then(function(){
-          toast('Signed out');
-          refreshAcctGreeting(null);
-        });
-      }else{
-        openAuth();
-      }
-    });
-  };
-
-  function refreshAcctGreeting(session){
-    var greet = document.getElementById('acct-greet');
-    var sub = document.getElementById('acct-greet-sub');
-    var action = document.getElementById('acct-auth-action');
-    if(session && session.user){
-      var label = session.user.user_metadata && session.user.user_metadata.full_name
-        ? session.user.user_metadata.full_name
-        : (session.user.email || 'Member');
-      greet.childNodes[0].textContent = 'Hello, ' + label;
-      sub.textContent = 'Manage your account below';
-      action.textContent = 'Sign Out';
-    }else{
-      greet.childNodes[0].textContent = 'Hello, Guest';
-      sub.textContent = 'Sign in for order history & membership';
-      action.textContent = 'Sign In';
-    }
-  }
-
-  function initAcctGreeting(){
-    if(!window.supabaseClient) return;
-    window.supabaseClient.auth.getSession().then(function(res){
-      refreshAcctGreeting(res && res.data && res.data.session);
-    });
-    window.supabaseClient.auth.onAuthStateChange(function(event, session){
-      if(event === 'SIGNED_IN') refreshAcctGreeting(session);
-      if(event === 'SIGNED_OUT') refreshAcctGreeting(null);
-    });
-  }
-
-  if(document.readyState === 'loading'){
-    document.addEventListener('DOMContentLoaded', initAcctGreeting);
-  }else{
-    initAcctGreeting();
-  }
-})();
-</script>
-</body>
-</html>
+          wireMesh.ro
