@@ -2,5 +2,35 @@
   "rewrites": [
     { "source": "/api/(.*)", "destination": "/api/$1" },
     { "source": "/:slug((?!src|assets|favicon).*)", "destination": "/page.html" }
+  ],
+  "crons": [
+    {
+      "path": "/api/admin?action=cron-daily-brief",
+      "schedule": "0 3 * * *"
+    },
+    {
+      "path": "/api/admin?action=cron-weekly-strategy",
+      "schedule": "0 3 * * 1"
+    },
+    {
+      "path": "/api/admin?action=cron-weekly-pricing-check",
+      "schedule": "30 3 * * 1"
+    },
+    {
+      "path": "/api/admin?action=cron-weekly-operations",
+      "schedule": "0 4 * * 1"
+    },
+    {
+      "path": "/api/admin?action=cron-weekly-system-health",
+      "schedule": "30 4 * * 1"
+    },
+    {
+      "path": "/api/admin?action=cron-weekly-finance",
+      "schedule": "0 5 * * 1"
+    },
+    {
+      "path": "/api/admin?action=cron-weekly-admin-security",
+      "schedule": "30 5 * * 1"
+    }
   ]
 }
