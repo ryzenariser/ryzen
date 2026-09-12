@@ -1,7 +1,7 @@
 const { supabase } = require('./_lib/supabase');
 const { hashPassword, verifyPassword } = require('./_lib/passwords');
 const { signCustomerToken, requireCustomerAuth, TOKEN_TTL_MS } = require('./_lib/customer-auth');
-const { requirePhoneVerification } = require('./otp');
+
 
 async function getSavedState(customerId) {
   const [{ data: cartRows }, { data: wlRows }, { data: address }] = await Promise.all([
@@ -22,15 +22,6 @@ async function handleSignup(req, res) {
   if (!email || !password) {
     return res.status(400).json({ error: 'Email and password are required.' });
   }
-
-  // If a phone number is supplied, it must have been verified via OTP first.
-  // The frontend attaches the proof token in this header after a successful
-  // /api/otp?action=verify-widget-token call. Skipping this check would let
-  // someone create accounts with unverified/fake phone numbers.
-  if (phone && !requirePhoneVerification(req, phone)) {
-    return res.status(400).json({ error: 'Phone number not verified. Please verify your phone before continuing.' });
-  }
-
   const { data: existing } = await supabase.from('customers').select('id').eq('email', email).maybeSingle();
   if (existing) {
     return res.status(409).json({ error: 'An account with this email already exists. Try signing in instead.' });
