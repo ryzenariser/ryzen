@@ -1,7 +1,35 @@
 const { supabase } = require('./_lib/supabase');
 const { hashPassword, verifyPassword } = require('./_lib/passwords');
 const { signCustomerToken, requireCustomerAuth, TOKEN_TTL_MS } = require('./_lib/customer-auth');
+const nodemailer = require('nodemailer');
 
+async function sendPasswordChangedEmail(email) {
+  const transporter = nodemailer.createTransport({
+    host: 'smtp.gmail.com',
+    port: 465,
+    secure: true,
+    auth: {
+      user: 'razarizerverify@gmail.com',
+      pass: process.env.GMAIL_APP_PASSWORD,
+    },
+  });
+
+  await transporter.sendMail({
+    from: '"Razariser" <razarizerverify@gmail.com>',
+    to: email,
+    subject: 'Your Razariser password was changed',
+    html: `<div style="background:#1a1a1a; padding:40px 0; font-family:Arial, sans-serif;">
+      <div style="max-width:380px; margin:0 auto; background:#0d0d0d; border:1px solid #3a3020; border-radius:12px; padding:40px 32px; text-align:center;">
+        <p style="font-size:22px; font-weight:bold; letter-spacing:2px; color:#d4af37; margin:0 0 4px;">RAZARISER</p>
+        <p style="font-size:12px; color:#8a8a8a; letter-spacing:1px; margin:0 0 28px;">STYLE FOR THE RISER</p>
+        <div style="width:40px; height:1px; background:#3a3020; margin:0 auto 28px;"></div>
+        <p style="font-size:17px; color:#e8e8e8; margin:0 0 14px; font-weight:bold;">Password changed</p>
+        <p style="font-size:13px; color:#b0b0b0; margin:0 0 24px; line-height:1.6;">Your Razariser account password was just changed. If this was you, no action is needed.</p>
+        <p style="font-size:12px; color:#e2a03f; margin:0;">If you didn't make this change, contact us immediately at razarizerverify@gmail.com.</p>
+      </div>
+    </div>`,
+  });
+}
 
 async function getSavedState(customerId) {
   const [{ data: cartRows }, { data: wlRows }, { data: address }] = await Promise.all([
@@ -137,6 +165,19 @@ async function handleGetState(req, res) {
   return res.status(200).json(saved);
 }
 
+async function handlePasswordChangedEmail(req, res) {
+  const { email } = req.body || {};
+  if (!email) {
+    return res.status(400).json({ error: 'Email is required.' });
+  }
+  try {
+    await sendPasswordChangedEmail(email);
+  } catch (err) {
+    console.error('Failed to send password-changed email:', err);
+  }
+  return res.status(200).json({ success: true });
+}
+
 module.exports = async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
@@ -151,9 +192,10 @@ module.exports = async (req, res) => {
     if (req.method === 'POST' && action === 'merge') return await handleMerge(req, res);
     if (req.method === 'POST' && action === 'save-address') return await handleSaveAddress(req, res);
     if (req.method === 'GET' && action === 'state') return await handleGetState(req, res);
+    if (req.method === 'POST' && action === 'password-changed-email') return await handlePasswordChangedEmail(req, res);
     return res.status(400).json({ error: 'Unknown action' });
   } catch (err) {
     console.error('customers.js error:', err);
     return res.status(500).json({ error: err.message || 'Internal server error' });
   }
-};
+};    
