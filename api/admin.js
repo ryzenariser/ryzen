@@ -786,6 +786,101 @@ async function handleSystemStatus(req, res) {
   }
 }
 
+/* ── Maintenance Mode: real, Super-Admin-only kill switch. Stored in
+   Supabase so status/history persist and are visible from any device.
+   NOTE: flipping this flag only records intent + notifies via Telegram —
+   your storefront (index.html or wherever it's served from) needs to
+   actually check this flag server-side and redirect/serve a backup page
+   when it's on. This endpoint is the source of truth for that check. ── */
+async function handleMaintenanceStatus(req, res) {
+  const session = requireAuth(req, res);
+  if (!session) return;
+  if (session.role !== 'super_admin') {
+    return res.status(403).json({ error: 'Super Admin only.' });
+  }
+
+  const { data, error } = await supabase
+    .from('store_maintenance_status')
+    .select('is_on, reason, updated_at')
+    .eq('id', 1)
+    .maybeSingle();
+  if (error) throw error;
+
+  return res.status(200).json({
+    on: !!(data && data.is_on),
+    reason: data ? data.reason : null,
+    updatedAt: data ? data.updated_at : null,
+  });
+}
+
+async function handleMaintenanceToggle(req, res) {
+  const session = requireAuth(req, res);
+  if (!session) return;
+  if (session.role !== 'super_admin') {
+    return res.status(403).json({ error: 'Super Admin only.' });
+  }
+
+  const { on, reason } = req.body || {};
+  if (typeof on !== 'boolean') {
+    return res.status(400).json({ error: '"on" (boolean) is required.' });
+  }
+  if (on && (!reason || !reason.trim())) {
+    return res.status(400).json({ error: 'A reason is required to turn maintenance mode on.' });
+  }
+
+  const finalReason = on ? reason.trim() : null;
+
+  const { error: upsertError } = await supabase
+    .from('store_maintenance_status')
+    .upsert({ id: 1, is_on: on, reason: finalReason, updated_by: session.username, updated_at: new Date().toISOString() });
+  if (upsertError) throw upsertError;
+
+  await supabase.from('store_maintenance_log').insert({
+    is_on: on,
+    reason: finalReason,
+    changed_by: session.username,
+  });
+
+  // Reuses the same Telegram alert path already used for login events —
+  // if TELEGRAM_BOT_TOKEN/TELEGRAM_CHAT_ID aren't set, this is a silent no-op.
+  try {
+    const token = process.env.TELEGRAM_BOT_TOKEN;
+    const chatId = process.env.TELEGRAM_CHAT_ID;
+    if (token && chatId) {
+      const time = new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
+      const text = on
+        ? `🔴 Maintenance Mode turned ON by ${session.username}\nReason: ${finalReason}\nTime: ${time}`
+        : `🟢 Maintenance Mode turned OFF by ${session.username}\nTime: ${time}`;
+      await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ chat_id: chatId, text }),
+      });
+    }
+  } catch (err) {
+    console.error('maintenance-toggle: Telegram alert failed:', err.message);
+  }
+
+  return res.status(200).json({ on, reason: finalReason });
+}
+
+async function handleMaintenanceHistory(req, res) {
+  const session = requireAuth(req, res);
+  if (!session) return;
+  if (session.role !== 'super_admin') {
+    return res.status(403).json({ error: 'Super Admin only.' });
+  }
+
+  const { data, error } = await supabase
+    .from('store_maintenance_log')
+    .select('is_on, reason, changed_by, created_at')
+    .order('created_at', { ascending: false })
+    .limit(20);
+  if (error) throw error;
+
+  return res.status(200).json({ history: data || [] });
+}
+
 /* ── Integrations: real presence check only — never returns values ── */
 const INTEGRATION_ENV_VARS = {
   github: { label: 'GitHub (content storage)', vars: ['GITHUB_TOKEN', 'GITHUB_OWNER', 'GITHUB_REPO'] },
@@ -2516,6 +2611,9 @@ module.exports = async function handler(req, res) {
     if (req.method === 'POST' && action === 'assistant') return await handleAssistant(req, res);
     if (req.method === 'GET' && action === 'system-status') return await handleSystemStatus(req, res);
     if (req.method === 'GET' && action === 'integrations-status') return await handleIntegrationsStatus(req, res);
+    if (req.method === 'GET' && action === 'maintenance-status') return await handleMaintenanceStatus(req, res);
+    if (req.method === 'POST' && action === 'maintenance-toggle') return await handleMaintenanceToggle(req, res);
+    if (req.method === 'GET' && action === 'maintenance-history') return await handleMaintenanceHistory(req, res);
     if (req.method === 'POST' && action === 'face-challenge-verify') return await handleFaceChallengeVerify(req, res);
     if (req.method === 'POST' && action === 'face-enroll-self') return await handleFaceEnrollSelf(req, res);
     if (req.method === 'POST' && action === 'face-enroll-for-admin') return await handleFaceEnrollForAdmin(req, res);
