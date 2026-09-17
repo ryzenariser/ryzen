@@ -841,11 +841,15 @@ async function handleMaintenanceToggle(req, res) {
     changed_by: session.username,
   });
 
-  // Reuses the same Telegram alert path already used for login events —
-  // if TELEGRAM_BOT_TOKEN/TELEGRAM_CHAT_ID aren't set, this is a silent no-op.
+  // Uses its OWN dedicated bot (TELEGRAM_BOT_TOKEN_MAINTENANCE /
+  // TELEGRAM_CHAT_ID_MAINTENANCE) — separate from the login-alert bot
+  // (TELEGRAM_BOT_TOKEN/TELEGRAM_CHAT_ID), same one-bot-per-purpose pattern
+  // used for the per-role bots elsewhere in this file. Falls back to the
+  // shared login bot only if the dedicated pair isn't configured. If
+  // neither is set, this is a silent no-op.
   try {
-    const token = process.env.TELEGRAM_BOT_TOKEN;
-    const chatId = process.env.TELEGRAM_CHAT_ID;
+    const token = process.env.TELEGRAM_BOT_TOKEN_MAINTENANCE || process.env.TELEGRAM_BOT_TOKEN;
+    const chatId = process.env.TELEGRAM_CHAT_ID_MAINTENANCE || process.env.TELEGRAM_CHAT_ID;
     if (token && chatId) {
       const time = new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
       const text = on
@@ -887,6 +891,7 @@ const INTEGRATION_ENV_VARS = {
   supabase: { label: 'Supabase (database)', vars: ['SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY'] },
   gemini: { label: 'Google Gemini (AI Assistant)', vars: ['GEMINI_API_KEY'] },
   telegram: { label: 'Telegram (login alerts)', vars: ['TELEGRAM_BOT_TOKEN', 'TELEGRAM_CHAT_ID'] },
+  telegramMaintenance: { label: 'Telegram (Maintenance Mode bot)', vars: ['TELEGRAM_BOT_TOKEN_MAINTENANCE', 'TELEGRAM_CHAT_ID_MAINTENANCE'] },
   razorpay: { label: 'Razorpay (payments/webhook)', vars: ['RAZORPAY_WEBHOOK_SECRET'] },
   vercel: { label: 'Vercel API (System status)', vars: ['VERCEL_API_TOKEN', 'VERCEL_PROJECT_ID'] },
 };
