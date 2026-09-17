@@ -451,6 +451,7 @@ tbody tr:hover{background:rgba(255,255,255,.02)}
       <div class="nav-item" data-tab="integrations" id="nav-integrations" style="display:none"><svg class="icon"><use href="#i-plug"/></svg>Integrations</div>
       <div class="nav-item disabled"><svg class="icon"><use href="#i-code"/></svg>Developer <span class="tag">Soon</span></div>
       <div class="nav-item" data-tab="system" id="nav-system" style="display:none"><svg class="icon"><use href="#i-cpu"/></svg>System</div>
+      <div class="nav-item" data-tab="maintenance" id="nav-maintenance" style="display:none"><svg class="icon"><use href="#i-shield"/></svg>Maintenance Mode</div>
       <div class="nav-item" data-tab="debug" id="nav-debug" style="display:none"><svg class="icon"><use href="#i-bolt"/></svg>Razariser AI Monitor</div>
       <div class="nav-item" id="nav-set-faceid"><svg class="icon"><use href="#i-face"/></svg>Face Recognition</div>
     </div>
@@ -873,6 +874,48 @@ tbody tr:hover{background:rgba(255,255,255,.02)}
         <div class="topbar"><h1>System</h1><button class="link-btn" id="logout-btn-system">Log out</button></div>
         <div style="font-size:12px;color:var(--gray);margin-bottom:16px">Real deployment status from Vercel. No CPU/RAM/storage metrics shown — those don't exist for stateless serverless functions, so we don't fake them.</div>
         <div id="system-status-content"><div class="empty-state">Loading…</div></div>
+      </div>
+
+      <!-- Maintenance Mode -->
+      <div class="tab-view" id="tab-maintenance" style="display:none">
+        <div class="topbar"><h1>Maintenance Mode</h1><button class="link-btn" id="logout-btn-maintenance">Log out</button></div>
+        <div style="font-size:12px;color:var(--gray);margin-bottom:16px">Takes the live store down and redirects customers to the backup. Every change is logged below with who did it, when, and why.</div>
+
+        <div class="panel glass" style="max-width:420px">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+            <strong style="font-size:14px">Store Status</strong>
+            <span id="maint-status-pill" class="int-status missing">Loading…</span>
+          </div>
+
+          <div id="maint-switch-track" style="width:100%;height:50px;border-radius:25px;position:relative;cursor:pointer;margin-bottom:16px;transition:background .35s var(--ease);background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1)">
+            <div id="maint-switch-knob" style="width:42px;height:42px;border-radius:50%;background:var(--bone);position:absolute;top:3px;left:3px;transition:left .35s var(--ease-spring),background .35s var(--ease);display:flex;align-items:center;justify-content:center;font-size:16px;box-shadow:0 2px 8px rgba(0,0,0,.4)">●</div>
+            <span id="maint-switch-label-off" style="position:absolute;right:18px;top:50%;transform:translateY(-50%);font-family:'Montserrat',sans-serif;font-size:10px;font-weight:700;letter-spacing:1px;color:var(--gray)">LIVE</span>
+            <span id="maint-switch-label-on" style="position:absolute;left:18px;top:50%;transform:translateY(-50%);font-family:'Montserrat',sans-serif;font-size:10px;font-weight:700;letter-spacing:1px;color:var(--bone);opacity:0;transition:opacity .3s ease">DOWN</span>
+          </div>
+
+          <div class="field" id="maint-reason-field">
+            <label>Reason (required to go down)</label>
+            <select id="maint-reason-select">
+              <option value="">Select a reason…</option>
+              <option value="Fixing a bug">Fixing a bug</option>
+              <option value="Payment/checkout issue">Payment/checkout issue</option>
+              <option value="Restocking inventory">Restocking inventory</option>
+              <option value="Scheduled maintenance">Scheduled maintenance</option>
+              <option value="Security incident">Security incident</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
+          <div class="field" id="maint-reason-other-field" style="display:none">
+            <input id="maint-reason-other" type="text" placeholder="Describe the reason…" />
+          </div>
+
+          <div class="error-msg" id="maint-error"></div>
+        </div>
+
+        <div class="panel glass" style="margin-top:16px;max-width:420px">
+          <div class="panel-hdr"><h2>Recent Activity</h2></div>
+          <div class="activity-list" id="maint-history-list"><div class="empty-state">Loading…</div></div>
+        </div>
       </div>
 
       <!-- Website -->
@@ -1460,7 +1503,7 @@ document.getElementById('face-enroll-capture-btn').addEventListener('click', asy
 document.getElementById('setup-faceid-btn').addEventListener('click', () => openFaceEnroll({ skippable: true }));
 document.getElementById('nav-set-faceid').addEventListener('click', () => openFaceEnroll({ skippable: true }));
 
-['logout-btn', 'logout-btn-2', 'logout-btn-3', 'logout-btn-4', 'logout-btn-5', 'logout-btn-orders', 'logout-btn-reports', 'logout-btn-integrations', 'logout-btn-system', 'logout-btn-marketing', 'logout-btn-orgchart', 'logout-btn-mydashboard'].forEach((id) => {
+['logout-btn', 'logout-btn-2', 'logout-btn-3', 'logout-btn-4', 'logout-btn-5', 'logout-btn-orders', 'logout-btn-reports', 'logout-btn-integrations', 'logout-btn-system', 'logout-btn-marketing', 'logout-btn-orgchart', 'logout-btn-mydashboard', 'logout-btn-maintenance'].forEach((id) => {
   document.getElementById(id).addEventListener('click', () => { clearToken(); showLogin(); });
 });
 
@@ -1511,6 +1554,7 @@ document.querySelectorAll('.nav-item[data-tab]').forEach((item) => {
     if (item.dataset.tab === 'reports') initReportsTab();
     if (item.dataset.tab === 'integrations') loadIntegrationsStatus();
     if (item.dataset.tab === 'system') loadSystemStatus();
+    if (item.dataset.tab === 'maintenance') loadMaintenanceStatus();
     if (item.dataset.tab === 'marketing') loadMarketingOverview();
     if (item.dataset.tab === 'orgchart') renderOrgChart();
     if (item.dataset.tab === 'mydashboard') loadMyDashboard();
@@ -1899,6 +1943,129 @@ async function loadSystemStatus() {
     el.innerHTML = `<div class="empty-state">${escapeHtml(err.message)}</div>`;
   }
 }
+
+/* ---------- Maintenance Mode (real, via /api/admin) ---------- */
+let maintenanceState = { on: false, reason: null };
+let maintenanceSubmitting = false;
+
+function renderMaintenanceState() {
+  const pill = document.getElementById('maint-status-pill');
+  const track = document.getElementById('maint-switch-track');
+  const knob = document.getElementById('maint-switch-knob');
+  const labelOff = document.getElementById('maint-switch-label-off');
+  const labelOn = document.getElementById('maint-switch-label-on');
+  const reasonField = document.getElementById('maint-reason-field');
+  const reasonOtherField = document.getElementById('maint-reason-other-field');
+
+  if (maintenanceState.on) {
+    pill.textContent = 'DOWN';
+    pill.className = 'int-status missing';
+    track.style.background = 'rgba(192,85,63,.18)';
+    track.style.borderColor = 'rgba(192,85,63,.4)';
+    knob.style.left = 'calc(100% - 45px)';
+    knob.style.background = 'var(--danger)';
+    labelOff.style.opacity = '0';
+    labelOn.style.opacity = '1';
+    reasonField.style.display = 'none';
+    reasonOtherField.style.display = 'none';
+  } else {
+    pill.textContent = 'LIVE';
+    pill.className = 'int-status ok';
+    track.style.background = 'rgba(255,255,255,.06)';
+    track.style.borderColor = 'rgba(255,255,255,.1)';
+    knob.style.left = '3px';
+    knob.style.background = 'var(--bone)';
+    labelOff.style.opacity = '1';
+    labelOn.style.opacity = '0';
+    reasonField.style.display = 'block';
+    reasonOtherField.style.display = document.getElementById('maint-reason-select').value === 'Other' ? 'block' : 'none';
+  }
+}
+
+function currentMaintReason() {
+  const sel = document.getElementById('maint-reason-select');
+  if (sel.value === 'Other') return document.getElementById('maint-reason-other').value.trim();
+  return sel.value;
+}
+
+async function loadMaintenanceStatus() {
+  try {
+    const data = await api('/api/admin?action=maintenance-status');
+    maintenanceState = { on: data.on, reason: data.reason };
+    if (data.on && data.reason) {
+      const sel = document.getElementById('maint-reason-select');
+      const match = Array.from(sel.options).find((o) => o.value === data.reason);
+      if (match) sel.value = data.reason;
+      else { sel.value = 'Other'; document.getElementById('maint-reason-other').value = data.reason; }
+    }
+    renderMaintenanceState();
+    loadMaintenanceHistory();
+  } catch (err) {
+    document.getElementById('maint-status-pill').textContent = 'Error';
+  }
+}
+
+async function loadMaintenanceHistory() {
+  const el = document.getElementById('maint-history-list');
+  el.innerHTML = '<div class="empty-state">Loading…</div>';
+  try {
+    const { history } = await api('/api/admin?action=maintenance-history');
+    if (!history.length) { el.innerHTML = '<div class="empty-state">No activity yet.</div>'; return; }
+    el.innerHTML = history.map((h) => `
+      <div class="activity-row">
+        <span class="activity-dot ${h.is_on ? 'fail' : 'ok'}"></span>
+        <div class="activity-text">
+          <div class="who">${h.is_on ? 'Went down' : 'Back up'} — ${escapeHtml(h.reason || 'No reason given')}</div>
+          <div class="what">${escapeHtml(h.changed_by || 'Unknown')}</div>
+        </div>
+        <div class="activity-when">${timeAgo(h.created_at)}</div>
+      </div>`).join('');
+  } catch (err) {
+    el.innerHTML = `<div class="empty-state">${escapeHtml(err.message)}</div>`;
+  }
+}
+
+document.getElementById('maint-reason-select').addEventListener('change', () => {
+  document.getElementById('maint-reason-other-field').style.display = document.getElementById('maint-reason-select').value === 'Other' ? 'block' : 'none';
+});
+
+document.getElementById('maint-switch-track').addEventListener('click', async () => {
+  if (maintenanceSubmitting) return;
+  const errEl = document.getElementById('maint-error');
+  errEl.textContent = '';
+
+  if (!maintenanceState.on) {
+    const reason = currentMaintReason();
+    if (!reason) { errEl.textContent = 'Select (or type) a reason before going down.'; return; }
+    if (!confirm('This takes the live store down and redirects customers to the backup. Continue?')) return;
+
+    maintenanceSubmitting = true;
+    try {
+      const data = await api('/api/admin?action=maintenance-toggle', { method: 'POST', body: JSON.stringify({ on: true, reason }) });
+      maintenanceState = { on: data.on, reason: data.reason };
+      renderMaintenanceState();
+      loadMaintenanceHistory();
+    } catch (err) {
+      errEl.textContent = err.message;
+    } finally {
+      maintenanceSubmitting = false;
+    }
+  } else {
+    maintenanceSubmitting = true;
+    try {
+      const data = await api('/api/admin?action=maintenance-toggle', { method: 'POST', body: JSON.stringify({ on: false }) });
+      maintenanceState = { on: data.on, reason: data.reason };
+      document.getElementById('maint-reason-select').value = '';
+      document.getElementById('maint-reason-other').value = '';
+      renderMaintenanceState();
+      loadMaintenanceHistory();
+    } catch (err) {
+      errEl.textContent = err.message;
+    } finally {
+      maintenanceSubmitting = false;
+    }
+  }
+});
 
 /* ---------- My Dashboard (role-scoped, real data only) ---------- */
 // Which real, working modules each seat gets a card for. Titles not listed
@@ -2500,6 +2667,7 @@ async function loadDashboard() {
     document.getElementById('nav-debug').style.display = currentRole === 'super_admin' ? 'flex' : 'none';
     document.getElementById('nav-integrations').style.display = (currentRole === 'super_admin' || currentOrgTitle === 'CTO') ? 'flex' : 'none';
     document.getElementById('nav-system').style.display = (currentRole === 'super_admin' || currentOrgTitle === 'CTO') ? 'flex' : 'none';
+    document.getElementById('nav-maintenance').style.display = currentRole === 'super_admin' ? 'flex' : 'none';
     initModeSwitcher();
     loadDashboardActivity();
     loadDashboardProductWidgets();
