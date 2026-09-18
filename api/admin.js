@@ -1,5 +1,3 @@
-
-Admin · JS
 // api/admin.js
 // Login + dashboard summary + AI assistant chat.
 //
@@ -8,12 +6,12 @@ Admin · JS
 // Nothing about how the assistant works changed — same Gemini call, same
 // read-only context, same auth requirement. Only its file location moved.
 // You can delete api/assistant.js once this is deployed.
- 
+
 const { signToken, requireAuth, TOKEN_TTL_MS } = require('./_lib/auth');
 const { supabase } = require('./_lib/supabase');
 const { verifyPassword } = require('./_lib/passwords');
 const { getJSON } = require('./_lib/github');
- 
+
 const FULL_PERMISSIONS = {
   products: { view: true, edit: true, delete: true },
   pages: { view: true, edit: true, delete: true },
@@ -21,11 +19,11 @@ const FULL_PERMISSIONS = {
   traffic: { view: true },
   admins: { view: true, edit: true, delete: true },
 };
- 
+
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const GEMINI_MODEL = 'gemini-2.5-flash-lite';
 const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
- 
+
 // Every Gemini call in this file goes through here. Free-tier rate limits
 // are shared across the WHOLE project — every feature, every Telegram bot,
 // every Cron job draws from the same pool — so bursts of activity (testing
@@ -48,13 +46,13 @@ async function fetchGeminiWithRetry(body, maxRetries = 2) {
   }
   return lastRes;
 }
- 
+
 function getClientIp(req) {
   const forwarded = req.headers['x-forwarded-for'];
   if (forwarded) return forwarded.split(',')[0].trim();
   return req.socket?.remoteAddress || 'unknown';
 }
- 
+
 // Logs every login attempt — success AND failure. adminId is null when the
 // attempt failed before we could match a real admin (bad username or wrong
 // password). Returns the new row's id so the frontend can later attach GPS
@@ -72,7 +70,7 @@ async function logLogin(adminId, attemptedUsername, success, req) {
       })
       .select('id')
       .single();
- 
+
     if (error) throw error;
     return data.id;
   } catch (err) {
@@ -80,30 +78,30 @@ async function logLogin(adminId, attemptedUsername, success, req) {
     return null;
   }
 }
- 
+
 async function sendTelegramAlert(admin, req, faceStatus) {
   try {
     const token = process.env.TELEGRAM_BOT_TOKEN;
     const chatId = process.env.TELEGRAM_CHAT_ID;
     if (!token || !chatId) return;
- 
+
     const ip = getClientIp(req);
     const userAgent = req.headers['user-agent'] || 'unknown';
     const time = new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
- 
+
     const faceLine = faceStatus === 'mismatch'
       ? '\n⚠️ FACE MISMATCH'
       : faceStatus === 'verified'
       ? '\n✅ Face verified'
       : '';
- 
+
     const message =
       `🔐 Razariser Admin Login\n` +
       `User: ${admin.username} (${admin.role})\n` +
       `IP: ${ip}\n` +
       `Device: ${userAgent}\n` +
       `Time: ${time}${faceLine}`;
- 
+
     await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -113,24 +111,24 @@ async function sendTelegramAlert(admin, req, faceStatus) {
     console.error('sendTelegramAlert failed:', err.message);
   }
 }
- 
+
 async function sendFailedLoginAlert(attemptedUsername, req) {
   try {
     const token = process.env.TELEGRAM_BOT_TOKEN;
     const chatId = process.env.TELEGRAM_CHAT_ID;
     if (!token || !chatId) return;
- 
+
     const ip = getClientIp(req);
     const userAgent = req.headers['user-agent'] || 'unknown';
     const time = new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
- 
+
     const message =
       `🚫 Failed Razariser Admin Login\n` +
       `Attempted username: ${attemptedUsername || 'unknown'}\n` +
       `IP: ${ip}\n` +
       `Device: ${userAgent}\n` +
       `Time: ${time}`;
- 
+
     await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -140,28 +138,28 @@ async function sendFailedLoginAlert(attemptedUsername, req) {
     console.error('sendFailedLoginAlert failed:', err.message);
   }
 }
- 
+
 async function handleLogin(req, res) {
   const { username, password } = req.body || {};
- 
+
   if (!username || !password) {
     return res.status(400).json({ error: 'Username and password are required.' });
   }
- 
+
   const { data: admin, error } = await supabase
     .from('admins')
     .select('*')
     .eq('username', username)
     .maybeSingle();
- 
+
   if (error) throw error;
- 
+
   if (!admin || !verifyPassword(password, admin.password_hash)) {
     // Log the failed attempt before responding — this is what feeds
     // Monitor Agent's brute-force detection.
     await logLogin(admin ? admin.id : null, username, false, req);
     await sendFailedLoginAlert(username, req);
- 
+
     // Track consecutive failures per-admin, including Super Admin (owner
     // requested this apply to their own account too — no exemption).
     if (admin) {
@@ -172,14 +170,14 @@ async function handleLogin(req, res) {
       }
       await supabase.from('admins').update(updates).eq('id', admin.id);
     }
- 
+
     return res.status(401).json({ error: 'Incorrect username or password.' });
   }
- 
+
   if (admin.deactivated_at) {
     return res.status(401).json({ error: 'This account has been deactivated.' });
   }
- 
+
   // Correct password. If this account is face-locked (3+ prior failures)
   // and already has a reference photo enrolled, don't issue a token yet —
   // require a face-recognition challenge first. Applies to every role.
@@ -189,17 +187,17 @@ async function handleLogin(req, res) {
       adminId: admin.id,
     });
   }
- 
+
   // Otherwise: correct password is enough. This also covers the case where
   // face_lock is set but no reference photo exists yet — that just means
   // this admin has never enrolled, so this login IS their enrollment
   // opportunity (per: "each admin enrolls their own face the first time
   // they log in successfully").
   await supabase.from('admins').update({ failed_attempt_count: 0, face_lock: false }).eq('id', admin.id);
- 
+
   const loginLogId = await logLogin(admin.id, admin.username, true, req);
   await sendTelegramAlert(admin, req);
- 
+
   const token = signToken({
     sub: admin.id,
     role: admin.role,
@@ -207,7 +205,7 @@ async function handleLogin(req, res) {
     permissions: admin.role === 'super_admin' ? FULL_PERMISSIONS : (admin.permissions || {}),
     exp: Date.now() + TOKEN_TTL_MS,
   });
- 
+
   return res.status(200).json({
     token,
     expiresInMs: TOKEN_TTL_MS,
@@ -221,7 +219,7 @@ async function handleLogin(req, res) {
     loginLogId,
   });
 }
- 
+
 // Called separately by the frontend right after a successful login, only
 // if the browser's geolocation prompt was accepted. Attaches exact GPS
 // coordinates to the login row created in handleLogin. This is the only
@@ -230,53 +228,53 @@ async function handleLogin(req, res) {
 async function handleUpdateLocation(req, res) {
   const session = requireAuth(req, res);
   if (!session) return;
- 
+
   const { loginLogId, latitude, longitude } = req.body || {};
   if (!loginLogId || typeof latitude !== 'number' || typeof longitude !== 'number') {
     return res.status(400).json({ error: 'loginLogId, latitude, and longitude are required.' });
   }
- 
+
   const { error } = await supabase
     .from('admin_logins')
     .update({ latitude, longitude })
     .eq('id', loginLogId)
     .eq('admin_id', session.sub); // can only update your own login row
- 
+
   if (error) throw error;
   return res.status(200).json({ ok: true });
 }
- 
+
 async function handleDashboard(req, res) {
   const session = requireAuth(req, res);
   if (!session) return;
- 
+
   const { data: admin } = await supabase
     .from('admins')
     .select('deactivated_at, org_title, username, active_mode')
     .eq('id', session.sub)
     .maybeSingle();
- 
+
   if (admin?.deactivated_at) {
     return res.status(401).json({ error: 'This account has been deactivated.' });
   }
- 
+
   let productCount = 0;
   let pageCount = 0;
- 
+
   try {
     const { count } = await supabase.from('products').select('*', { count: 'exact', head: true });
     productCount = count || 0;
   } catch (err) {
     console.error('dashboard: products count failed:', err.message);
   }
- 
+
   try {
     const { count } = await supabase.from('pages').select('*', { count: 'exact', head: true });
     pageCount = count || 0;
   } catch (err) {
     console.error('dashboard: pages count failed:', err.message);
   }
- 
+
   let orderCount = 0;
   try {
     const { count } = await supabase.from('orders').select('*', { count: 'exact', head: true });
@@ -284,7 +282,7 @@ async function handleDashboard(req, res) {
   } catch (err) {
     console.error('dashboard: orders count failed:', err.message);
   }
- 
+
   let activeRoles = [];
   try {
     const { data: rolesData } = await supabase.from('admin_active_roles').select('role_title').eq('admin_id', session.sub);
@@ -292,7 +290,7 @@ async function handleDashboard(req, res) {
   } catch (err) {
     console.error('dashboard: active roles fetch failed:', err.message);
   }
- 
+
   return res.status(200).json({
     stats: { products: productCount, pages: pageCount, orders: orderCount },
     role: session.role,
@@ -302,22 +300,22 @@ async function handleDashboard(req, res) {
     username: admin?.username || null,
   });
 }
- 
+
 async function handleLoginLogs(req, res) {
   const session = requireAuth(req, res);
   if (!session) return;
- 
+
   const { data, error } = await supabase
     .from('admin_logins')
     .select('created_at, ip_address, user_agent, success, attempted_username, latitude, longitude, admins ( username, role )')
     .order('created_at', { ascending: false })
     .limit(50);
- 
+
   if (error) {
     console.error('handleLoginLogs failed:', error.message);
     return res.status(500).json({ error: error.message });
   }
- 
+
   const logins = (data || []).map((row) => ({
     when: row.created_at,
     username: row.admins?.username || row.attempted_username || 'unknown',
@@ -328,15 +326,15 @@ async function handleLoginLogs(req, res) {
     latitude: row.latitude,
     longitude: row.longitude,
   }));
- 
+
   return res.status(200).json({ logins });
 }
- 
+
 /* ── Merged from assistant.js — read-only chat, no write path at all ── */
 async function buildAssistantContext() {
   let productsSummary = 'No products loaded.';
   let pagesSummary = 'No pages loaded.';
- 
+
   try {
     const { data: products } = await getJSON('public/products.json');
     if (Array.isArray(products) && products.length) {
@@ -348,14 +346,14 @@ async function buildAssistantContext() {
   } catch (err) {
     console.error('assistant: failed to load products.json context:', err.message);
   }
- 
+
   try {
     const { data: pages, error } = await supabase
       .from('pages')
       .select('slug, title, type')
       .order('created_at', { ascending: false })
       .limit(50);
- 
+
     if (error) throw error;
     if (Array.isArray(pages) && pages.length) {
       pagesSummary = pages.map((p) => `- ${p.title} (${p.type}, /${p.slug})`).join('\n');
@@ -363,10 +361,10 @@ async function buildAssistantContext() {
   } catch (err) {
     console.error('assistant: failed to load pages context:', err.message);
   }
- 
+
   return `Current products in the store:\n${productsSummary}\n\nCurrent pages:\n${pagesSummary}`;
 }
- 
+
 // Real, honest per-role grounding for the mode switcher. Roles with no
 // dedicated data source say so explicitly rather than inventing context —
 // same principle as everywhere else in this panel.
@@ -377,7 +375,7 @@ async function buildAssistantContext() {
    deployments through a tool call. Personal Assistant gets full CRUD on
    notes because those are personal, low-stakes, and instantly reversible —
    a fundamentally different risk profile from live business/financial data. ── */
- 
+
 const TOOL_HANDLERS = {
   async getOrderStats() {
     const { data, count } = await supabase.from('orders').select('amount, status', { count: 'exact' }).limit(5000);
@@ -417,7 +415,7 @@ const TOOL_HANDLERS = {
   async checkPricingConsistency() {
     const { data: products } = await getJSON('public/products.json');
     if (!Array.isArray(products) || !products.length) return { outliers: [], note: 'No product data available.' };
- 
+
     const byCategory = {};
     products.forEach((p) => {
       const cat = p.catLabel || p.cat || 'Uncategorized';
@@ -425,7 +423,7 @@ const TOOL_HANDLERS = {
       if (!isFinite(price)) return;
       (byCategory[cat] = byCategory[cat] || []).push({ name: p.name, price });
     });
- 
+
     const outliers = [];
     Object.entries(byCategory).forEach(([cat, items]) => {
       if (items.length < 3) return; // not enough in-category data for a meaningful comparison
@@ -463,7 +461,7 @@ const TOOL_HANDLERS = {
     return { deleted: true };
   },
 };
- 
+
 const TOOL_DECLARATIONS = {
   getOrderStats: { name: 'getOrderStats', description: 'Get real total order count and revenue right now.', parameters: { type: 'OBJECT', properties: {} } },
   getProductList: { name: 'getProductList', description: 'Get the real current product catalog.', parameters: { type: 'OBJECT', properties: {} } },
@@ -476,7 +474,7 @@ const TOOL_DECLARATIONS = {
   toggleNoteDone: { name: 'toggleNoteDone', description: 'Mark a note done or not done.', parameters: { type: 'OBJECT', properties: { id: { type: 'STRING' }, done: { type: 'BOOLEAN' } }, required: ['id', 'done'] } },
   deleteNote: { name: 'deleteNote', description: 'Delete a note.', parameters: { type: 'OBJECT', properties: { id: { type: 'STRING' } }, required: ['id'] } },
 };
- 
+
 // Which tools each persona is allowed to use — deliberately not "every tool
 // everywhere." A role only gets tools relevant to its real domain.
 const ROLE_TOOL_NAMES = {
@@ -490,13 +488,13 @@ const ROLE_TOOL_NAMES = {
   CECO: ['getPageList'],
   CTO: ['getSystemStatus'],
 };
- 
+
 function getToolsForPersona(persona) {
   const names = ROLE_TOOL_NAMES[persona];
   if (!names || !names.length) return null;
   return [{ function_declarations: names.map((n) => TOOL_DECLARATIONS[n]) }];
 }
- 
+
 // The actual function-calling loop: ask Gemini, execute any tool calls it
 // makes against REAL data, feed the result back, repeat up to a small cap
 // so a confused model can't loop forever inside one request.
@@ -513,7 +511,7 @@ async function logAiUsage(feature, persona, success, errorMessage, tokensIn, tok
     console.error('logAiUsage failed:', err.message);
   }
 }
- 
+
 async function runGeminiWithTools(systemInstruction, contents, tools, session, logMeta) {
   let workingContents = [...contents];
   const MAX_ROUNDS = 4;
@@ -521,11 +519,11 @@ async function runGeminiWithTools(systemInstruction, contents, tools, session, l
   let totalTokensIn = 0, totalTokensOut = 0;
   const feature = logMeta?.feature || 'assistant';
   const persona = logMeta?.persona || null;
- 
+
   for (let round = 0; round < MAX_ROUNDS; round++) {
     const body = { system_instruction: systemInstruction, contents: workingContents };
     if (tools) body.tools = tools;
- 
+
     const geminiRes = await fetchGeminiWithRetry(body);
     if (!geminiRes.ok) {
       const errText = await geminiRes.text();
@@ -538,12 +536,12 @@ async function runGeminiWithTools(systemInstruction, contents, tools, session, l
     totalTokensOut += data.usageMetadata?.candidatesTokenCount || 0;
     const parts = data.candidates?.[0]?.content?.parts || [];
     const functionCallPart = parts.find((p) => p.functionCall);
- 
+
     if (!functionCallPart) {
       logAiUsage(feature, persona, true, null, totalTokensIn, totalTokensOut, Date.now() - startTime);
       return parts.map((p) => p.text || '').join('') || 'No response generated.';
     }
- 
+
     const { name, args } = functionCallPart.functionCall;
     const handler = TOOL_HANDLERS[name];
     let result;
@@ -553,15 +551,15 @@ async function runGeminiWithTools(systemInstruction, contents, tools, session, l
       console.error('tool handler failed:', name, err.message);
       result = { error: 'Tool execution failed.' };
     }
- 
+
     workingContents.push({ role: 'model', parts: [{ functionCall: { name, args } }] });
     workingContents.push({ role: 'function', parts: [{ functionResponse: { name, response: { result } } }] });
   }
- 
+
   logAiUsage(feature, persona, false, 'Reached tool-call round limit', totalTokensIn, totalTokensOut, Date.now() - startTime);
   return 'Reached the tool-call limit for this turn — try rephrasing or asking a narrower question.';
 }
- 
+
 async function buildRoleContext(persona, session) {
   if (persona === 'personal' || !persona) {
     let notesText = 'No notes/reminders saved yet.';
@@ -580,12 +578,12 @@ async function buildRoleContext(persona, session) {
     }
     return { promptRole: 'a Personal Assistant', context: `The admin's saved notes/reminders:\n${notesText}` };
   }
- 
+
   if (persona === 'CMO') {
     const mc = await buildMarketingContext();
     return { promptRole: 'Razariser\'s Chief Marketing Officer (CMO)', context: marketingContextToPromptText(mc) };
   }
- 
+
   // Shared cheap counts, reused by several personas below.
   let productCount = 0, pageCount = 0, orderCount = 0;
   try {
@@ -598,7 +596,7 @@ async function buildRoleContext(persona, session) {
   } catch (err) {
     console.error('buildRoleContext shared counts failed:', err.message);
   }
- 
+
   if (persona === 'CTO') {
     const hasVercelToken = !!(process.env.VERCEL_API_TOKEN && process.env.VERCEL_PROJECT_ID);
     return {
@@ -645,20 +643,20 @@ async function buildRoleContext(persona, session) {
     context: `No dedicated module or real data source exists for this function in Razariser yet — this seat is currently unstaffed by any system feature. Give general, sound advice for this domain, but be explicit that you have no company-specific data to ground it in.`,
   };
 }
- 
+
 async function handleAssistant(req, res) {
   const session = requireAuth(req, res);
   if (!session) return;
- 
+
   if (!GEMINI_API_KEY) {
     return res.status(500).json({ error: 'GEMINI_API_KEY is not set in Vercel environment variables.' });
   }
- 
+
   const { message, history, persona } = req.body || {};
   if (!message || typeof message !== 'string') {
     return res.status(400).json({ error: 'Missing "message" in request body.' });
   }
- 
+
   const effectivePersona = persona || 'personal';
   let promptRole = 'a Personal Assistant';
   let context = '';
@@ -671,7 +669,7 @@ async function handleAssistant(req, res) {
     promptRole = roleCtx.promptRole;
     context = roleCtx.context;
   }
- 
+
   const tools = getToolsForPersona(effectivePersona);
   const systemInstruction = {
     parts: [
@@ -692,7 +690,7 @@ async function handleAssistant(req, res) {
       },
     ],
   };
- 
+
   // Server-side memory is the source of truth for continuity — not
   // whatever the client happens to send. Falls back to client-sent
   // `history` only if the memory fetch fails for some reason.
@@ -710,7 +708,7 @@ async function handleAssistant(req, res) {
     console.error('handleAssistant: memory fetch failed, falling back to client history:', err.message);
     priorTurns = Array.isArray(history) ? history : [];
   }
- 
+
   const contents = [
     ...priorTurns.map((h) => ({
       role: h.role === 'assistant' ? 'model' : 'user',
@@ -718,15 +716,15 @@ async function handleAssistant(req, res) {
     })),
     { role: 'user', parts: [{ text: message }] },
   ];
- 
+
   const finalReply = await runGeminiWithTools(systemInstruction, contents, tools, session, { feature: 'assistant-panel', persona: effectivePersona });
- 
+
   // Fire-and-forget — persisted memory shouldn't block or fail the reply itself.
   saveRoleMemoryTurn(session.sub, effectivePersona, message, finalReply);
- 
+
   return res.status(200).json({ reply: finalReply });
 }
- 
+
 /* ── System: real deployment status via Vercel API (no CPU/RAM — that
    doesn't exist for stateless serverless functions, so we don't fake it) ── */
 // Real access check: Super Admin always passes. Otherwise, look up the
@@ -738,31 +736,31 @@ async function hasOrgTitleAccess(session, allowedTitles) {
   const { data } = await supabase.from('admins').select('org_title').eq('id', session.sub).maybeSingle();
   return !!(data && data.org_title && allowedTitles.includes(data.org_title));
 }
- 
+
 async function handleSystemStatus(req, res) {
   const session = requireAuth(req, res);
   if (!session) return;
   if (!(await hasOrgTitleAccess(session, ['CTO']))) {
     return res.status(403).json({ error: 'Restricted to Super Admin or the CTO seat.' });
   }
- 
+
   const token = process.env.VERCEL_API_TOKEN;
   const projectId = process.env.VERCEL_PROJECT_ID;
   const teamId = process.env.VERCEL_TEAM_ID; // optional, only needed for team accounts
- 
+
   if (!token || !projectId) {
     return res.status(200).json({
       configured: false,
       message: 'Add VERCEL_API_TOKEN and VERCEL_PROJECT_ID in Vercel env vars to enable real deployment status here.',
     });
   }
- 
+
   try {
     const url = new URL('https://api.vercel.com/v6/deployments');
     url.searchParams.set('projectId', projectId);
     url.searchParams.set('limit', '5');
     if (teamId) url.searchParams.set('teamId', teamId);
- 
+
     const vercelRes = await fetch(url.toString(), {
       headers: { Authorization: `Bearer ${token}` },
     });
@@ -780,14 +778,14 @@ async function handleSystemStatus(req, res) {
       url: d.url,
       commitMessage: d.meta?.githubCommitMessage || null,
     }));
- 
+
     return res.status(200).json({ configured: true, deployments });
   } catch (err) {
     console.error('handleSystemStatus failed:', err.message);
     return res.status(500).json({ error: 'Could not reach Vercel API.' });
   }
 }
- 
+
 /* ── Maintenance Mode: real, Super-Admin-only kill switch. Stored in
    Supabase so status/history persist and are visible from any device.
    NOTE: flipping this flag only records intent + notifies via Telegram —
@@ -800,47 +798,47 @@ async function handleMaintenanceStatus(req, res) {
   if (session.role !== 'super_admin') {
     return res.status(403).json({ error: 'Super Admin only.' });
   }
- 
+
   const { data, error } = await supabase
     .from('store_maintenance_status')
     .select('is_on, reason, updated_at')
     .eq('id', 1)
     .maybeSingle();
   if (error) throw error;
- 
+
   return res.status(200).json({
     on: !!(data && data.is_on),
     reason: data ? data.reason : null,
     updatedAt: data ? data.updated_at : null,
   });
 }
- 
+
 // Shared by both the admin-panel toggle (below) and the Telegram webhook,
 // so there is exactly one code path that ever writes the actual state.
 async function applyMaintenanceChange({ on, reason, changedBy }) {
   const finalReason = on ? reason.trim() : null;
- 
+
   const { error: upsertError } = await supabase
     .from('store_maintenance_status')
     .upsert({ id: 1, is_on: on, reason: finalReason, updated_by: changedBy, updated_at: new Date().toISOString() });
   if (upsertError) throw upsertError;
- 
+
   await supabase.from('store_maintenance_log').insert({
     is_on: on,
     reason: finalReason,
     changed_by: changedBy,
   });
- 
+
   return { on, reason: finalReason };
 }
- 
+
 async function handleMaintenanceToggle(req, res) {
   const session = requireAuth(req, res);
   if (!session) return;
   if (session.role !== 'super_admin') {
     return res.status(403).json({ error: 'Super Admin only.' });
   }
- 
+
   const { on, reason } = req.body || {};
   if (typeof on !== 'boolean') {
     return res.status(400).json({ error: '"on" (boolean) is required.' });
@@ -848,9 +846,9 @@ async function handleMaintenanceToggle(req, res) {
   if (on && (!reason || !reason.trim())) {
     return res.status(400).json({ error: 'A reason is required to turn maintenance mode on.' });
   }
- 
+
   const result = await applyMaintenanceChange({ on, reason: reason || '', changedBy: session.username });
- 
+
   // Uses its OWN dedicated bot (TELEGRAM_BOT_TOKEN_MAINTENANCE /
   // TELEGRAM_CHAT_ID_MAINTENANCE) — separate from the login-alert bot
   // (TELEGRAM_BOT_TOKEN/TELEGRAM_CHAT_ID), same one-bot-per-purpose pattern
@@ -874,27 +872,110 @@ async function handleMaintenanceToggle(req, res) {
   } catch (err) {
     console.error('maintenance-toggle: Telegram alert failed:', err.message);
   }
- 
+
   return res.status(200).json(result);
 }
- 
+
+// Two-way control: the Maintenance Mode bot can flip the switch, not just
+// announce it. Bypasses requireAuth entirely (Telegram calls this, not the
+// admin panel) — verified instead by a dedicated webhook secret AND by
+// requiring the message come from the exact configured chat, since a
+// command here can take the live store down. Setup:
+//   1. Set TELEGRAM_BOT_TOKEN_MAINTENANCE, TELEGRAM_CHAT_ID_MAINTENANCE,
+//      and TELEGRAM_WEBHOOK_SECRET_MAINTENANCE (any random string you pick)
+//      as Vercel env vars, then redeploy.
+//   2. Register the webhook once:
+//      https://api.telegram.org/bot<TOKEN>/setWebhook?url=<your-domain>/api/admin?action=maintenance-webhook&secret_token=<TELEGRAM_WEBHOOK_SECRET_MAINTENANCE>
+//   3. In the bot's chat, send: /on <reason>, /off, or /status
+async function handleMaintenanceTelegramWebhook(req, res) {
+  const secret = process.env.TELEGRAM_WEBHOOK_SECRET_MAINTENANCE;
+  const incomingSecret = req.headers['x-telegram-bot-api-secret-token'];
+  if (!secret || incomingSecret !== secret) {
+    return res.status(401).json({ error: 'Unauthorized.' });
+  }
+
+  const message = req.body?.message;
+  if (!message || !message.text) {
+    return res.status(200).json({ ok: true }); // nothing to do, but ack so Telegram stops retrying
+  }
+
+  const chatId = message.chat.id;
+  const expectedChatId = process.env.TELEGRAM_CHAT_ID_MAINTENANCE;
+  if (!expectedChatId || String(chatId) !== String(expectedChatId)) {
+    // Silently ignore commands from any chat other than the one configured
+    // for this bot — no error detail leaked back to an unrecognized chat.
+    return res.status(200).json({ ok: true });
+  }
+
+  const token = process.env.TELEGRAM_BOT_TOKEN_MAINTENANCE;
+  const text = message.text.trim();
+  const senderName = message.from?.username ? '@' + message.from.username : (message.from?.first_name || 'Telegram');
+
+  async function reply(msg) {
+    if (!token) return;
+    try {
+      await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ chat_id: chatId, text: msg }),
+      });
+    } catch (err) {
+      console.error('maintenance-webhook: reply failed:', err.message);
+    }
+  }
+
+  try {
+    if (/^\/status\b/i.test(text)) {
+      const { data } = await supabase.from('store_maintenance_status').select('is_on, reason, updated_at').eq('id', 1).maybeSingle();
+      const statusText = data && data.is_on ? `🔴 DOWN — ${data.reason || 'no reason recorded'}` : '🟢 LIVE';
+      await reply(`Current status: ${statusText}`);
+      return res.status(200).json({ ok: true });
+    }
+
+    if (/^\/off\b/i.test(text)) {
+      await applyMaintenanceChange({ on: false, reason: '', changedBy: `Telegram (${senderName})` });
+      await reply('🟢 Maintenance Mode turned OFF.');
+      return res.status(200).json({ ok: true });
+    }
+
+    const onMatch = text.match(/^\/on\s+(.+)/is);
+    if (onMatch) {
+      const reason = onMatch[1].trim();
+      await applyMaintenanceChange({ on: true, reason, changedBy: `Telegram (${senderName})` });
+      await reply(`🔴 Maintenance Mode turned ON.\nReason: ${reason}`);
+      return res.status(200).json({ ok: true });
+    }
+    if (/^\/on\b/i.test(text)) {
+      await reply('A reason is required. Usage: /on <reason>');
+      return res.status(200).json({ ok: true });
+    }
+
+    await reply('Commands:\n/on <reason> — take the store down\n/off — bring it back up\n/status — check current state');
+    return res.status(200).json({ ok: true });
+  } catch (err) {
+    console.error('maintenance-webhook: command handling failed:', err.message);
+    await reply('Something went wrong processing that — check Vercel logs.');
+    return res.status(200).json({ ok: true });
+  }
+}
+
 async function handleMaintenanceHistory(req, res) {
   const session = requireAuth(req, res);
   if (!session) return;
   if (session.role !== 'super_admin') {
     return res.status(403).json({ error: 'Super Admin only.' });
   }
- 
+
   const { data, error } = await supabase
     .from('store_maintenance_log')
     .select('is_on, reason, changed_by, created_at')
     .order('created_at', { ascending: false })
     .limit(20);
   if (error) throw error;
- 
+
   return res.status(200).json({ history: data || [] });
 }
- 
+
 /* ── Integrations: real presence check only — never returns values ── */
 const INTEGRATION_ENV_VARS = {
   github: { label: 'GitHub (content storage)', vars: ['GITHUB_TOKEN', 'GITHUB_OWNER', 'GITHUB_REPO'] },
@@ -905,43 +986,43 @@ const INTEGRATION_ENV_VARS = {
   razorpay: { label: 'Razorpay (payments/webhook)', vars: ['RAZORPAY_WEBHOOK_SECRET'] },
   vercel: { label: 'Vercel API (System status)', vars: ['VERCEL_API_TOKEN', 'VERCEL_PROJECT_ID'] },
 };
- 
+
 async function handleIntegrationsStatus(req, res) {
   const session = requireAuth(req, res);
   if (!session) return;
   if (!(await hasOrgTitleAccess(session, ['CTO']))) {
     return res.status(403).json({ error: 'Restricted to Super Admin or the CTO seat.' });
   }
- 
+
   const integrations = Object.entries(INTEGRATION_ENV_VARS).map(([key, def]) => ({
     key,
     label: def.label,
     configured: def.vars.every((v) => !!process.env[v]),
     missing: def.vars.filter((v) => !process.env[v]),
   }));
- 
+
   return res.status(200).json({ integrations });
 }
- 
+
 /* ── Face recognition (photo comparison via Gemini vision) ──────────────
    This is a separate system from webauthn.js (device Face ID/Touch ID).
    That system is left untouched; this one triggers automatically after
    3 consecutive wrong passwords, using an enrolled reference photo per
    admin. Super Admin is exempt (handled in handleLogin above). ──────── */
 const FACE_BUCKET = 'admin-face-references';
- 
+
 function base64ToBuffer(dataUrl) {
   const commaIdx = dataUrl.indexOf(',');
   const b64 = commaIdx > -1 ? dataUrl.slice(commaIdx + 1) : dataUrl;
   return Buffer.from(b64, 'base64');
 }
- 
+
 async function compareFacesWithGemini(referenceBuffer, challengeBuffer) {
   if (!GEMINI_API_KEY) {
     console.error('compareFacesWithGemini: GEMINI_API_KEY not set');
     return { match: false, confidence: 'low', reason: 'AI comparison unavailable (no API key configured).' };
   }
- 
+
   const body = {
     contents: [{
       role: 'user',
@@ -958,7 +1039,7 @@ async function compareFacesWithGemini(referenceBuffer, challengeBuffer) {
       ],
     }],
   };
- 
+
   try {
     const geminiRes = await fetchGeminiWithRetry(body);
     if (!geminiRes.ok) {
@@ -982,7 +1063,7 @@ async function compareFacesWithGemini(referenceBuffer, challengeBuffer) {
     return { match: false, confidence: 'low', reason: 'Could not complete AI comparison — failing closed (denied).' };
   }
 }
- 
+
 // Liveness-aware version: takes a reference photo plus TWO challenge frames
 // captured a couple seconds apart (the frontend prompts "turn your head" in
 // between). Checks identity AND whether the two frames show natural live
@@ -998,7 +1079,7 @@ async function compareFacesWithLiveness(referenceBuffer, frame1Buffer, frame2Buf
     console.error('compareFacesWithLiveness: GEMINI_API_KEY not set');
     return { match: false, live: false, confidence: 'low', reason: 'AI comparison unavailable (no API key configured).' };
   }
- 
+
   const body = {
     contents: [{
       role: 'user',
@@ -1024,7 +1105,7 @@ async function compareFacesWithLiveness(referenceBuffer, frame1Buffer, frame2Buf
       ],
     }],
   };
- 
+
   try {
     const geminiRes = await fetchGeminiWithRetry(body);
     if (!geminiRes.ok) {
@@ -1047,13 +1128,13 @@ async function compareFacesWithLiveness(referenceBuffer, frame1Buffer, frame2Buf
     return { match: false, live: false, confidence: 'low', reason: 'Could not complete AI comparison — failing closed (denied).' };
   }
 }
- 
+
 async function sendFaceChallengeToTelegram(admin, req, matchResult, imageBuffer, matchedAs) {
   try {
     const token = process.env.TELEGRAM_BOT_TOKEN;
     const chatId = process.env.TELEGRAM_CHAT_ID;
     if (!token || !chatId) return;
- 
+
     const ip = getClientIp(req);
     const userAgent = req.headers['user-agent'] || 'unknown';
     const time = new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
@@ -1061,7 +1142,7 @@ async function sendFaceChallengeToTelegram(admin, req, matchResult, imageBuffer,
     const resultLine = passed ? '✅ Face MATCHED — access granted' : '🚫 Face check FAILED — access denied';
     const livenessLine = matchResult.live === false ? '\n🕵️ Liveness check failed — possible photo/screen spoof' : '';
     const overrideLine = matchedAs === 'super_admin_override' ? '\n⚠️ Unlocked using Super Admin\'s face, not the account owner\'s own face' : '';
- 
+
     const caption =
       `🧑‍💻 Razariser Face Recognition Challenge\n` +
       `User: ${admin.username} (${admin.role})\n` +
@@ -1070,12 +1151,12 @@ async function sendFaceChallengeToTelegram(admin, req, matchResult, imageBuffer,
       `IP: ${ip}\n` +
       `Device: ${userAgent}\n` +
       `Time: ${time}`;
- 
+
     const form = new FormData();
     form.append('chat_id', chatId);
     form.append('caption', caption);
     form.append('photo', new Blob([imageBuffer], { type: 'image/jpeg' }), 'face-challenge.jpg');
- 
+
     const res = await fetch(`https://api.telegram.org/bot${token}/sendPhoto`, { method: 'POST', body: form });
     if (!res.ok) {
       console.error('sendFaceChallengeToTelegram: Telegram error', res.status, await res.text());
@@ -1084,13 +1165,13 @@ async function sendFaceChallengeToTelegram(admin, req, matchResult, imageBuffer,
     console.error('sendFaceChallengeToTelegram failed:', err.message);
   }
 }
- 
+
 async function handleFaceChallengeVerify(req, res) {
   const { adminId, imageBase64, imageBase64Frame2 } = req.body || {};
   if (!adminId || !imageBase64 || !imageBase64Frame2) {
     return res.status(400).json({ error: 'adminId and two captured frames (imageBase64, imageBase64Frame2) are required.' });
   }
- 
+
   const { data: admin, error } = await supabase.from('admins').select('*').eq('id', adminId).maybeSingle();
   if (error) throw error;
   if (!admin || admin.deactivated_at) {
@@ -1099,17 +1180,17 @@ async function handleFaceChallengeVerify(req, res) {
   if (!admin.face_reference_path) {
     return res.status(400).json({ error: 'No reference photo enrolled for this account yet.' });
   }
- 
+
   const frame1Buffer = base64ToBuffer(imageBase64);
   const frame2Buffer = base64ToBuffer(imageBase64Frame2);
- 
+
   // Try the account's own reference photo first.
   const { data: ownRefFile, error: ownDlError } = await supabase.storage.from(FACE_BUCKET).download(admin.face_reference_path);
   if (ownDlError) throw ownDlError;
   const ownReferenceBuffer = Buffer.from(await ownRefFile.arrayBuffer());
   let matchResult = await compareFacesWithLiveness(ownReferenceBuffer, frame1Buffer, frame2Buffer);
   let matchedAs = 'self';
- 
+
   // If it's not their own face, and this isn't already the Super Admin's
   // own account, also try the Super Admin's enrolled face — the owner can
   // stand in and unlock any sub-admin's login this way. Still has to pass
@@ -1128,13 +1209,13 @@ async function handleFaceChallengeVerify(req, res) {
       }
     }
   }
- 
+
   const passed = matchResult.match && matchResult.live;
- 
+
   // Every challenge attempt — pass or fail — gets sent to Telegram, per
   // instruction: "each face recognition must need to sent through telegram".
   await sendFaceChallengeToTelegram(admin, req, matchResult, frame2Buffer, matchedAs);
- 
+
   if (!passed) {
     await logLogin(admin.id, admin.username, false, req);
     const reasonDetail = !matchResult.match
@@ -1142,11 +1223,11 @@ async function handleFaceChallengeVerify(req, res) {
       : `identity matched but liveness check failed: ${matchResult.reason || 'possible photo/screen spoof detected'}`;
     return res.status(401).json({ error: `Face verification failed (${reasonDetail}). This attempt was logged and sent to the owner.` });
   }
- 
+
   await supabase.from('admins').update({ failed_attempt_count: 0, face_lock: false }).eq('id', admin.id);
   const loginLogId = await logLogin(admin.id, admin.username, true, req);
   await sendTelegramAlert(admin, req);
- 
+
   const token = signToken({
     sub: admin.id,
     role: admin.role,
@@ -1154,7 +1235,7 @@ async function handleFaceChallengeVerify(req, res) {
     permissions: admin.role === 'super_admin' ? FULL_PERMISSIONS : (admin.permissions || {}),
     exp: Date.now() + TOKEN_TTL_MS,
   });
- 
+
   return res.status(200).json({
     token,
     expiresInMs: TOKEN_TTL_MS,
@@ -1163,83 +1244,83 @@ async function handleFaceChallengeVerify(req, res) {
     loginLogId,
   });
 }
- 
+
 async function handleFaceEnrollSelf(req, res) {
   const session = requireAuth(req, res);
   if (!session) return;
- 
+
   const { imageBase64 } = req.body || {};
   if (!imageBase64) return res.status(400).json({ error: 'imageBase64 is required.' });
- 
+
   const path = `${session.sub}.jpg`;
   const buffer = base64ToBuffer(imageBase64);
- 
+
   const { error: uploadError } = await supabase.storage
     .from(FACE_BUCKET)
     .upload(path, buffer, { contentType: 'image/jpeg', upsert: true });
   if (uploadError) throw uploadError;
- 
+
   const { error: updateError } = await supabase.from('admins').update({ face_reference_path: path }).eq('id', session.sub);
   if (updateError) throw updateError;
- 
+
   return res.status(200).json({ ok: true });
 }
- 
+
 async function handleFaceEnrollForAdmin(req, res) {
   const session = requireAuth(req, res);
   if (!session) return;
   if (session.role !== 'super_admin') {
     return res.status(403).json({ error: 'Super Admin only.' });
   }
- 
+
   const { adminId, imageBase64 } = req.body || {};
   if (!adminId || !imageBase64) return res.status(400).json({ error: 'adminId and imageBase64 are required.' });
- 
+
   const path = `${adminId}.jpg`;
   const buffer = base64ToBuffer(imageBase64);
- 
+
   const { error: uploadError } = await supabase.storage
     .from(FACE_BUCKET)
     .upload(path, buffer, { contentType: 'image/jpeg', upsert: true });
   if (uploadError) throw uploadError;
- 
+
   const { error: updateError } = await supabase.from('admins').update({ face_reference_path: path }).eq('id', adminId);
   if (updateError) throw updateError;
- 
+
   return res.status(200).json({ ok: true });
 }
- 
+
 async function handleFaceStatus(req, res) {
   const session = requireAuth(req, res);
   if (!session) return;
- 
+
   const targetId = req.query.adminId || session.sub;
   if (targetId !== session.sub && session.role !== 'super_admin') {
     return res.status(403).json({ error: 'You can only check your own Face Recognition status.' });
   }
- 
+
   const { data: admin, error } = await supabase
     .from('admins').select('face_reference_path, face_lock, failed_attempt_count').eq('id', targetId).maybeSingle();
   if (error) throw error;
   if (!admin) return res.status(404).json({ error: 'Admin not found.' });
- 
+
   return res.status(200).json({
     enrolled: !!admin.face_reference_path,
     faceLock: !!admin.face_lock,
     failedAttempts: admin.failed_attempt_count || 0,
   });
 }
- 
+
 async function handleFaceStatusAll(req, res) {
   const session = requireAuth(req, res);
   if (!session) return;
   if (session.role !== 'super_admin') {
     return res.status(403).json({ error: 'Super Admin only.' });
   }
- 
+
   const { data, error } = await supabase.from('admins').select('id, face_reference_path, face_lock, failed_attempt_count');
   if (error) throw error;
- 
+
   const statuses = (data || []).map((a) => ({
     adminId: a.id,
     enrolled: !!a.face_reference_path,
@@ -1248,14 +1329,14 @@ async function handleFaceStatusAll(req, res) {
   }));
   return res.status(200).json({ statuses });
 }
- 
+
 // Org Chart seat assignment — Super Admin (the "Board of Directors" seat)
 // assigns each sub-admin a real title from the org chart. This is purely a
 // label/identity layer on top of the existing, real permissions system —
 // it does not itself grant or restrict access to anything. Kept in
 // admin.js rather than admins.js so this stays self-contained.
 const ORG_TITLES = ['COO', 'CTO', 'CFO', 'CMO', 'CLO', 'CHRO', 'CAIO', 'CDO (Design)', 'CPO', 'CECO', 'CCO', 'CDO (Data)'];
- 
+
 // Each role has its OWN Telegram bot (its own token, its own webhook) —
 // not one shared bot with topic threads. Env var names can't contain
 // spaces/parens, so this maps each role to a safe key:
@@ -1265,14 +1346,14 @@ const ROLE_ENV_KEYS = {
   'CDO (Design)': 'CDO_DESIGN', 'CPO': 'CPO', 'CECO': 'CECO', 'CCO': 'CCO', 'CDO (Data)': 'CDO_DATA',
 };
 const ENV_KEY_TO_ROLE = Object.fromEntries(Object.entries(ROLE_ENV_KEYS).map(([role, key]) => [key, role]));
- 
+
 async function handleOrgTitlesAll(req, res) {
   const session = requireAuth(req, res);
   if (!session) return;
- 
+
   const { data, error } = await supabase.from('admins').select('id, username, role, org_title');
   if (error) throw error;
- 
+
   const titles = (data || []).map((a) => ({
     adminId: a.id,
     username: a.username,
@@ -1281,14 +1362,14 @@ async function handleOrgTitlesAll(req, res) {
   }));
   return res.status(200).json({ titles, availableTitles: ORG_TITLES });
 }
- 
+
 async function handleOrgTitleSet(req, res) {
   const session = requireAuth(req, res);
   if (!session) return;
   if (session.role !== 'super_admin') {
     return res.status(403).json({ error: 'Only the Board of Directors (Super Admin) can assign seats.' });
   }
- 
+
   const { adminId, orgTitle } = req.body || {};
   if (!adminId) {
     return res.status(400).json({ error: 'adminId is required.' });
@@ -1296,13 +1377,13 @@ async function handleOrgTitleSet(req, res) {
   if (orgTitle && !ORG_TITLES.includes(orgTitle)) {
     return res.status(400).json({ error: 'Unrecognized org title.' });
   }
- 
+
   const { error } = await supabase.from('admins').update({ org_title: orgTitle || null }).eq('id', adminId);
   if (error) throw error;
- 
+
   return res.status(200).json({ success: true });
 }
- 
+
 /* ── Multi-role activation: each admin/sub-admin can have SEVERAL personas
    active simultaneously (not just one), each getting its own daily Cron
    brief and its own persisted conversation memory. Same permission rule as
@@ -1314,11 +1395,11 @@ async function assertRoleAllowed(session, roleTitle) {
   const { data } = await supabase.from('admins').select('org_title').eq('id', session.sub).maybeSingle();
   return !!(data && data.org_title === roleTitle);
 }
- 
+
 async function handleToggleActiveRole(req, res) {
   const session = requireAuth(req, res);
   if (!session) return;
- 
+
   const { roleTitle, active } = req.body || {};
   if (!roleTitle || (roleTitle !== 'personal' && !ORG_TITLES.includes(roleTitle))) {
     return res.status(400).json({ error: 'Unrecognized role.' });
@@ -1326,7 +1407,7 @@ async function handleToggleActiveRole(req, res) {
   if (!(await assertRoleAllowed(session, roleTitle))) {
     return res.status(403).json({ error: 'You can only activate a role you actually hold.' });
   }
- 
+
   if (active) {
     const { error } = await supabase.from('admin_active_roles').upsert(
       { admin_id: session.sub, role_title: roleTitle },
@@ -1339,7 +1420,7 @@ async function handleToggleActiveRole(req, res) {
   }
   return res.status(200).json({ success: true });
 }
- 
+
 async function handleActiveRolesList(req, res) {
   const session = requireAuth(req, res);
   if (!session) return;
@@ -1347,7 +1428,7 @@ async function handleActiveRolesList(req, res) {
   if (error) throw error;
   return res.status(200).json({ activeRoles: (data || []).map((r) => r.role_title) });
 }
- 
+
 /* ── Per-role persistent memory: each active persona remembers its OWN
    conversation, separately, across sessions and devices — not just
    whatever's in the browser tab. Scoped to admin_id + role_title. ── */
@@ -1365,7 +1446,7 @@ async function handleRoleMemoryList(req, res) {
   if (error) throw error;
   return res.status(200).json({ messages: data || [] });
 }
- 
+
 async function saveRoleMemoryTurn(adminId, roleTitle, userMessage, assistantReply) {
   try {
     await supabase.from('admin_role_memory').insert([
@@ -1376,7 +1457,7 @@ async function saveRoleMemoryTurn(adminId, roleTitle, userMessage, assistantRepl
     console.error('saveRoleMemoryTurn failed:', err.message);
   }
 }
- 
+
 /* ── Notes/Reminders: the persistent-state piece behind Personal Assistant
    mode. Always scoped to the requesting admin's own id — no admin can see
    another admin's notes, including Super Admin (these are personal, not
@@ -1392,7 +1473,7 @@ async function handleNotesList(req, res) {
   if (error) throw error;
   return res.status(200).json({ notes: data || [] });
 }
- 
+
 async function handleNoteCreate(req, res) {
   const session = requireAuth(req, res);
   if (!session) return;
@@ -1408,7 +1489,7 @@ async function handleNoteCreate(req, res) {
   if (error) throw error;
   return res.status(200).json({ note: data });
 }
- 
+
 async function handleNoteUpdate(req, res) {
   const session = requireAuth(req, res);
   if (!session) return;
@@ -1421,7 +1502,7 @@ async function handleNoteUpdate(req, res) {
   if (error) throw error;
   return res.status(200).json({ success: true });
 }
- 
+
 async function handleNoteDelete(req, res) {
   const session = requireAuth(req, res);
   if (!session) return;
@@ -1431,7 +1512,7 @@ async function handleNoteDelete(req, res) {
   if (error) throw error;
   return res.status(200).json({ success: true });
 }
- 
+
 /* ── Daily Cron brief: the genuine "works on its own" piece. Vercel Hobby
    caps cron at once/day, firing sometime within the scheduled hour — this
    is honest automation, not continuous monitoring. Triggered by Vercel's
@@ -1453,15 +1534,15 @@ async function handleNoteDelete(req, res) {
         copying of thread IDs needed.
    "personal" is deliberately NOT reachable via Telegram — tied to one
    admin's own notes, no single company-wide bot makes sense for it. ── */
- 
+
 async function handleTelegramBotsStatus(req, res) {
   const session = requireAuth(req, res);
   if (!session) return;
- 
+
   const { data: rows } = await supabase.from('telegram_role_bots').select('role_title, chat_id');
   const chatByRole = {};
   (rows || []).forEach((r) => { chatByRole[r.role_title] = r.chat_id; });
- 
+
   const statuses = ORG_TITLES.map((role) => {
     const key = ROLE_ENV_KEYS[role];
     const hasToken = !!process.env[`TELEGRAM_BOT_TOKEN_${key}`];
@@ -1474,7 +1555,7 @@ async function handleTelegramBotsStatus(req, res) {
   });
   return res.status(200).json({ statuses });
 }
- 
+
 async function handleTelegramWebhook(req, res) {
   // Verify this really came from Telegram, not a random POST to a guessed URL.
   const secret = process.env.TELEGRAM_WEBHOOK_SECRET;
@@ -1482,25 +1563,25 @@ async function handleTelegramWebhook(req, res) {
   if (!secret || incomingSecret !== secret) {
     return res.status(401).json({ error: 'Unauthorized.' });
   }
- 
+
   const roleKey = req.query.role;
   const roleTitle = ENV_KEY_TO_ROLE[roleKey];
   if (!roleTitle) {
     return res.status(200).json({ ok: true }); // unrecognized role key, ignore
   }
- 
+
   const token = process.env[`TELEGRAM_BOT_TOKEN_${roleKey}`];
   if (!token) {
     return res.status(200).json({ ok: true }); // this role's bot isn't configured
   }
- 
+
   const message = req.body?.message;
   if (!message || !message.text) {
     return res.status(200).json({ ok: true }); // nothing to do, but ack so Telegram stops retrying
   }
- 
+
   const chatId = message.chat.id;
- 
+
   // First message this bot has ever received — auto-register its chat_id,
   // no manual thread-ID copying required.
   await supabase
@@ -1509,17 +1590,17 @@ async function handleTelegramWebhook(req, res) {
       { role_title: roleTitle, chat_id: chatId, first_seen_at: new Date().toISOString(), updated_at: new Date().toISOString() },
       { onConflict: 'role_title' }
     );
- 
+
   try {
     const roleCtx = await buildRoleContext(roleTitle, { sub: null });
- 
+
     const { data: memRows } = await supabase
       .from('telegram_role_memory')
       .select('role, content')
       .eq('role_title', roleTitle)
       .order('created_at', { ascending: true })
       .limit(30);
- 
+
     const tools = getToolsForPersona(roleTitle);
     const systemInstruction = {
       parts: [{
@@ -1534,17 +1615,17 @@ async function handleTelegramWebhook(req, res) {
       ...(memRows || []).map((m) => ({ role: m.role === 'assistant' ? 'model' : 'user', parts: [{ text: m.content }] })),
       { role: 'user', parts: [{ text: message.text }] },
     ];
- 
+
     const reply = GEMINI_API_KEY
       ? await runGeminiWithTools(systemInstruction, contents, tools, { sub: null }, { feature: 'telegram-bot', persona: roleTitle })
       : 'No response generated.';
- 
+
     await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ chat_id: chatId, text: reply }),
     });
- 
+
     await supabase.from('telegram_role_memory').insert([
       { role_title: roleTitle, role: 'user', content: message.text },
       { role_title: roleTitle, role: 'assistant', content: reply },
@@ -1552,29 +1633,29 @@ async function handleTelegramWebhook(req, res) {
   } catch (err) {
     console.error('handleTelegramWebhook failed:', err.message);
   }
- 
+
   return res.status(200).json({ ok: true });
 }
- 
+
 async function handleCronDailyBrief(req, res) {
   const cronSecret = process.env.CRON_SECRET;
   const authHeader = req.headers.authorization || '';
   if (!cronSecret || authHeader !== `Bearer ${cronSecret}`) {
     return res.status(401).json({ error: 'Unauthorized.' });
   }
- 
+
   const { data: activeRoles, error } = await supabase
     .from('admin_active_roles')
     .select('admin_id, role_title');
   if (error) throw error;
- 
+
   const adminIds = [...new Set((activeRoles || []).map((r) => r.admin_id))];
   let usernameById = {};
   if (adminIds.length) {
     const { data: adminRows } = await supabase.from('admins').select('id, username').in('id', adminIds);
     (adminRows || []).forEach((a) => { usernameById[a.id] = a.username; });
   }
- 
+
   const results = [];
   for (const row of activeRoles || []) {
     const adminId = row.admin_id;
@@ -1582,9 +1663,9 @@ async function handleCronDailyBrief(req, res) {
     const username = usernameById[adminId] || adminId;
     try {
       const roleCtx = await buildRoleContext(roleTitle, { sub: adminId });
- 
+
       if (!GEMINI_API_KEY) continue;
- 
+
       const systemInstruction = {
         parts: [{
           text:
@@ -1597,7 +1678,7 @@ async function handleCronDailyBrief(req, res) {
       if (!geminiRes.ok) { results.push({ admin: username, role: roleTitle, ok: false }); continue; }
       const data = await geminiRes.json();
       const brief = data.candidates?.[0]?.content?.parts?.map((p) => p.text || '').join('') || '';
- 
+
       const roleKey = ROLE_ENV_KEYS[roleTitle];
       const token = roleKey ? process.env[`TELEGRAM_BOT_TOKEN_${roleKey}`] : null;
       const { data: botRow } = roleKey ? await supabase.from('telegram_role_bots').select('chat_id').eq('role_title', roleTitle).maybeSingle() : { data: null };
@@ -1615,13 +1696,13 @@ async function handleCronDailyBrief(req, res) {
       results.push({ admin: username, role: roleTitle, ok: false });
     }
   }
- 
+
   const allOk = results.every((r) => r.ok);
   logAiUsage('cron-daily-brief', null, allOk, allOk ? null : 'one or more roles failed', null, null, null);
- 
+
   return res.status(200).json({ processed: results.length, results });
 }
- 
+
 /* ── Weekly Cron: auto-regenerate the Marketing Strategy and check pricing
    consistency, notify via the CMO's own Telegram bot if configured. Same
    CRON_SECRET auth pattern as the daily brief — bypasses requireAuth
@@ -1631,7 +1712,7 @@ function checkCronAuth(req) {
   const authHeader = req.headers.authorization || '';
   return !!cronSecret && authHeader === `Bearer ${cronSecret}`;
 }
- 
+
 async function sendToRoleBot(roleTitle, text) {
   const key = ROLE_ENV_KEYS[roleTitle];
   if (!key) return;
@@ -1645,22 +1726,22 @@ async function sendToRoleBot(roleTitle, text) {
     body: JSON.stringify({ chat_id: botRow.chat_id, text }),
   }).catch((err) => console.error(`sendToRoleBot(${roleTitle}) failed:`, err.message));
 }
- 
+
 async function sendToCmoBot(text) {
   return sendToRoleBot('CMO', text);
 }
- 
+
 async function handleCronWeeklyStrategy(req, res) {
   if (!checkCronAuth(req)) return res.status(401).json({ error: 'Unauthorized.' });
   if (!GEMINI_API_KEY) return res.status(200).json({ skipped: true, reason: 'no Gemini key' });
- 
+
   try {
     const context = await buildMarketingContext();
     const contextText = marketingContextToPromptText(context);
     const stageNote = context.orders.hasData
       ? `Razariser has ${context.orders.count} real orders — some revenue history exists to reason from.`
       : 'Razariser has ZERO orders so far. This is a pre-revenue stage. A real strategy for this stage prioritizes getting first sales and validating real demand — NOT scaling, retention loops, LTV optimization, or paid acquisition at volume. Say this plainly rather than writing generic growth-marketing advice.';
- 
+
     const systemInstruction = {
       parts: [{
         text:
@@ -1685,10 +1766,10 @@ async function handleCronWeeklyStrategy(req, res) {
     const data = await geminiRes.json();
     const text = data.candidates?.[0]?.content?.parts?.map((p) => p.text || '').join('') || '';
     const strategy = JSON.parse(text.replace(/```json|```/g, '').trim());
- 
+
     await supabase.from('marketing_strategy_versions').insert({ content: strategy });
     await sendToCmoBot(`📈 Weekly strategy refreshed.\n\nStage: ${strategy.stageAssessment}\n\nThis week's priority: ${strategy.primaryObjective}\n\nFull strategy in the panel's Marketing → Strategy tab.`);
- 
+
     logAiUsage('cron-weekly-strategy', 'CMO', true, null, data.usageMetadata?.promptTokenCount, data.usageMetadata?.candidatesTokenCount, null);
     return res.status(200).json({ ok: true });
   } catch (err) {
@@ -1697,10 +1778,10 @@ async function handleCronWeeklyStrategy(req, res) {
     return res.status(200).json({ ok: false, error: err.message });
   }
 }
- 
+
 async function handleCronWeeklyPricingCheck(req, res) {
   if (!checkCronAuth(req)) return res.status(401).json({ error: 'Unauthorized.' });
- 
+
   try {
     const result = await TOOL_HANDLERS.checkPricingConsistency();
     if (!result.outliers || !result.outliers.length) {
@@ -1718,7 +1799,7 @@ async function handleCronWeeklyPricingCheck(req, res) {
     return res.status(200).json({ ok: false, error: err.message });
   }
 }
- 
+
 /* ── COO — Weekly Operations Check: real order fulfillment status. Honest
    when there's nothing to report (0 orders = 0 orders, not padded out). ── */
 async function handleCronWeeklyOperations(req, res) {
@@ -1746,7 +1827,7 @@ async function handleCronWeeklyOperations(req, res) {
     return res.status(200).json({ ok: false, error: err.message });
   }
 }
- 
+
 /* ── CTO — Weekly System Health Check: real Vercel deployment status +
    real integration configuration state. ── */
 async function handleCronWeeklySystemHealth(req, res) {
@@ -1757,7 +1838,7 @@ async function handleCronWeeklySystemHealth(req, res) {
       key, label: def.label, configured: def.vars.every((v) => !!process.env[v]),
     }));
     const notConfigured = integrations.filter((i) => !i.configured);
- 
+
     let deployLine = 'Vercel API not configured — no live deployment data available.';
     if (sysStatus.configured && sysStatus.recentDeployments?.length) {
       const latest = sysStatus.recentDeployments[0];
@@ -1767,7 +1848,7 @@ async function handleCronWeeklySystemHealth(req, res) {
     const integrationsLine = notConfigured.length
       ? `⚠️ Not configured: ${notConfigured.map((i) => i.label).join(', ')}`
       : '✓ All integrations configured.';
- 
+
     await sendToRoleBot('CTO', `🖥️ Weekly System Health Check\n\n${deployLine}\n\n${integrationsLine}`);
     logAiUsage('cron-weekly-system-health', 'CTO', true, null, null, null, null);
     return res.status(200).json({ ok: true });
@@ -1777,7 +1858,7 @@ async function handleCronWeeklySystemHealth(req, res) {
     return res.status(200).json({ ok: false, error: err.message });
   }
 }
- 
+
 /* ── CFO — Weekly Financial Summary: real revenue/order snapshot. ── */
 async function handleCronWeeklyFinance(req, res) {
   if (!checkCronAuth(req)) return res.status(401).json({ error: 'Unauthorized.' });
@@ -1795,7 +1876,7 @@ async function handleCronWeeklyFinance(req, res) {
     return res.status(200).json({ ok: false, error: err.message });
   }
 }
- 
+
 /* ── CHRO — Weekly Admin Security Check: real face-lock status and login
    activity across all admin accounts. Only genuinely "HR-adjacent" real
    data that exists in this system — admin accounts, not employees. ── */
@@ -1806,11 +1887,11 @@ async function handleCronWeeklyAdminSecurity(req, res) {
     const rows = admins || [];
     const locked = rows.filter((a) => a.face_lock);
     const notEnrolled = rows.filter((a) => !a.face_reference_path);
- 
+
     const since7d = new Date(Date.now() - 7 * 86400000).toISOString();
     const { data: recentLogins } = await supabase.from('admin_logins').select('success').gte('created_at', since7d).limit(500);
     const failedLogins = (recentLogins || []).filter((l) => !l.success).length;
- 
+
     const lines = [
       `Total admin accounts: ${rows.length}`,
       locked.length ? `⚠️ Currently face-locked: ${locked.map((a) => a.username).join(', ')}` : '✓ No accounts currently locked.',
@@ -1826,14 +1907,14 @@ async function handleCronWeeklyAdminSecurity(req, res) {
     return res.status(200).json({ ok: false, error: err.message });
   }
 }
- 
+
 /* ── Marketing AI: real-data overview + AI Content Studio + campaign
    planner. No ad-platform, no local LLM, no competitor scraping, no
    forecasting — that infrastructure doesn't exist. This reuses the same
    Gemini call already used for the Assistant, grounded in real
    Supabase/GitHub data where it exists, and explicitly labeled empty where
    it doesn't (orders currently has 0 rows). ── */
- 
+
 async function buildMarketingContext() {
   const context = {
     products: { count: 0, byCategory: {}, sample: [] },
@@ -1843,7 +1924,7 @@ async function buildMarketingContext() {
     wishlistActivity: { count: 0 },
     orders: { count: 0, revenue: 0, hasData: false },
   };
- 
+
   try {
     const { data: products } = await getJSON('public/products.json');
     if (Array.isArray(products)) {
@@ -1859,14 +1940,14 @@ async function buildMarketingContext() {
   } catch (err) {
     console.error('marketing: products context failed:', err.message);
   }
- 
+
   try {
     const { count } = await supabase.from('customers').select('*', { count: 'exact', head: true });
     context.customers.count = count || 0;
   } catch (err) {
     console.error('marketing: customers count failed:', err.message);
   }
- 
+
   try {
     const { data: views, count } = await supabase.from('page_views').select('path', { count: 'exact' }).limit(2000);
     context.pageViews.count = count || 0;
@@ -1881,7 +1962,7 @@ async function buildMarketingContext() {
   } catch (err) {
     console.error('marketing: page_views failed:', err.message);
   }
- 
+
   try {
     const [{ count: c1 }, { count: c2 }] = await Promise.all([
       supabase.from('cart_items').select('*', { count: 'exact', head: true }),
@@ -1891,7 +1972,7 @@ async function buildMarketingContext() {
   } catch (err) {
     console.error('marketing: cart activity failed:', err.message);
   }
- 
+
   try {
     const [{ count: w1 }, { count: w2 }] = await Promise.all([
       supabase.from('wishlist_items').select('*', { count: 'exact', head: true }),
@@ -1901,7 +1982,7 @@ async function buildMarketingContext() {
   } catch (err) {
     console.error('marketing: wishlist activity failed:', err.message);
   }
- 
+
   try {
     const { data: orders, count } = await supabase.from('orders').select('amount, status').limit(5000);
     context.orders.count = count || (orders ? orders.length : 0);
@@ -1914,10 +1995,10 @@ async function buildMarketingContext() {
   } catch (err) {
     console.error('marketing: orders context failed:', err.message);
   }
- 
+
   return context;
 }
- 
+
 function marketingContextToPromptText(context) {
   const catLines = Object.entries(context.products.byCategory).map(([cat, n]) => `  - ${cat}: ${n}`).join('\n') || '  (none)';
   const topPathLines = context.pageViews.topPaths.map((p) => `  - ${p.path}: ${p.views} views`).join('\n') || '  (no page view data)';
@@ -1933,15 +2014,15 @@ function marketingContextToPromptText(context) {
       : `Orders: NONE YET — Razariser has no completed sales history. Do not invent conversion rates, revenue figures, CAC, LTV, or forecasts. State plainly that these require real order data once sales start.`,
   ].join('\n');
 }
- 
+
 async function handleMarketingOverview(req, res) {
   const session = requireAuth(req, res);
   if (!session) return;
- 
+
   const context = await buildMarketingContext();
   return res.status(200).json({ context });
 }
- 
+
 // Proactive analysis — this is the "notices things and tells you" behavior,
 // not another chat box waiting for a question. Still grounded only in real
 // data: with 3 customers and 0 orders, it's told explicitly to flag low
@@ -1949,14 +2030,14 @@ async function handleMarketingOverview(req, res) {
 async function handleMarketingBrief(req, res) {
   const session = requireAuth(req, res);
   if (!session) return;
- 
+
   if (!GEMINI_API_KEY) {
     return res.status(500).json({ error: 'GEMINI_API_KEY is not set in Vercel environment variables.' });
   }
- 
+
   const context = await buildMarketingContext();
   const contextText = marketingContextToPromptText(context);
- 
+
   const systemInstruction = {
     parts: [{
       text:
@@ -1977,19 +2058,19 @@ async function handleMarketingBrief(req, res) {
         'Give 3 to 6 points, ranked most important first.',
     }],
   };
- 
+
   const geminiRes = await fetchGeminiWithRetry({ system_instruction: systemInstruction, contents: [{ role: 'user', parts: [{ text: 'Generate today\'s brief.' }] }] });
- 
+
   if (!geminiRes.ok) {
     const errText = await geminiRes.text();
     console.error('marketing-brief: Gemini API error:', geminiRes.status, errText);
     return res.status(502).json({ error: `AI service error (${geminiRes.status}). Try again in a moment.` });
   }
- 
+
   const data = await geminiRes.json();
   const text = data.candidates?.[0]?.content?.parts?.map((p) => p.text || '').join('') || '';
   const cleaned = text.replace(/```json|```/g, '').trim();
- 
+
   let brief;
   try {
     brief = JSON.parse(cleaned);
@@ -1997,21 +2078,21 @@ async function handleMarketingBrief(req, res) {
     console.error('marketing-brief: failed to parse JSON:', err.message, cleaned);
     return res.status(502).json({ error: 'AI returned an unexpected format. Try again.' });
   }
- 
+
   return res.status(200).json({ brief });
 }
- 
+
 // Real forecasting engine — gated on sample size rather than faked. Below
 // the threshold it returns exactly that: how many more orders are needed
 // before a forecast is statistically meaningful. Once there's enough
 // history, this computes an actual trend from actual order timestamps —
 // no AI guessing involved, this part is arithmetic.
 const FORECAST_MIN_ORDERS = 10;
- 
+
 async function handleMarketingForecast(req, res) {
   const session = requireAuth(req, res);
   if (!session) return;
- 
+
   let orders = [];
   try {
     const { data } = await supabase
@@ -2025,7 +2106,7 @@ async function handleMarketingForecast(req, res) {
     console.error('marketing-forecast: orders query failed:', err.message);
     return res.status(500).json({ error: 'Could not load order history.' });
   }
- 
+
   if (orders.length < FORECAST_MIN_ORDERS) {
     return res.status(200).json({
       ready: false,
@@ -2034,7 +2115,7 @@ async function handleMarketingForecast(req, res) {
       message: `Forecasting needs at least ${FORECAST_MIN_ORDERS} completed orders to be statistically meaningful. You have ${orders.length} right now. This isn't a fixed wait — it just activates automatically the moment you cross that line.`,
     });
   }
- 
+
   // Real math: bucket by day, compare trailing 14-day average order value
   // and daily order rate against the 14 days before that. No AI involved.
   const now = Date.now();
@@ -2044,7 +2125,7 @@ async function handleMarketingForecast(req, res) {
     const age = now - new Date(o.created_at).getTime();
     return age > 14 * dayMs && age <= 28 * dayMs;
   });
- 
+
   const sum = (arr) => arr.reduce((s, o) => s + (Number(o.amount) || 0), 0);
   const recentRevenue = sum(recentWindow);
   const priorRevenue = sum(priorWindow);
@@ -2052,7 +2133,7 @@ async function handleMarketingForecast(req, res) {
   const priorDailyOrders = priorWindow.length / 14;
   const revenueTrendPct = priorRevenue > 0 ? Math.round(((recentRevenue - priorRevenue) / priorRevenue) * 100) : null;
   const projectedNext14DayRevenue = Math.round(recentDailyOrders * 14 * (recentWindow.length ? recentRevenue / recentWindow.length : 0));
- 
+
   return res.status(200).json({
     ready: true,
     totalOrders: orders.length,
@@ -2064,7 +2145,7 @@ async function handleMarketingForecast(req, res) {
     note: 'Simple trailing-window trend from your real order history — not an AI guess. Treat as directional, especially with a small order count.',
   });
 }
- 
+
 async function handleBrandVoiceCheck(req, res) {
   const session = requireAuth(req, res);
   if (!session) return;
@@ -2075,7 +2156,7 @@ async function handleBrandVoiceCheck(req, res) {
   if (!text || !text.trim()) {
     return res.status(400).json({ error: 'text is required.' });
   }
- 
+
   const systemInstruction = {
     parts: [{
       text:
@@ -2088,7 +2169,7 @@ async function handleBrandVoiceCheck(req, res) {
         '{"onBrand": true or false, "issues": ["specific issue with a specific fix, or empty array if none"], "revisedVersion": "a revised version if there were issues, otherwise the original text unchanged"}',
     }],
   };
- 
+
   const startTime = Date.now();
   const geminiRes = await fetchGeminiWithRetry({ system_instruction: systemInstruction, contents: [{ role: 'user', parts: [{ text }] }] });
   if (!geminiRes.ok) {
@@ -2108,23 +2189,23 @@ async function handleBrandVoiceCheck(req, res) {
   logAiUsage('brand-voice-check', 'CMO', true, null, data.usageMetadata?.promptTokenCount, data.usageMetadata?.candidatesTokenCount, Date.now() - startTime);
   return res.status(200).json(result);
 }
- 
+
 async function handleMarketingContent(req, res) {
   const session = requireAuth(req, res);
   if (!session) return;
- 
+
   if (!GEMINI_API_KEY) {
     return res.status(500).json({ error: 'GEMINI_API_KEY is not set in Vercel environment variables.' });
   }
- 
+
   const { contentType, brief, productName, tone } = req.body || {};
   if (!contentType || !brief) {
     return res.status(400).json({ error: 'contentType and brief are required.' });
   }
- 
+
   const context = await buildMarketingContext();
   const contextText = marketingContextToPromptText(context);
- 
+
   const CONTENT_TYPE_LABELS = {
     product_description: 'a product description',
     instagram_caption: 'an Instagram caption (with relevant hashtags)',
@@ -2145,7 +2226,7 @@ async function handleMarketingContent(req, res) {
   };
   const typeLabel = CONTENT_TYPE_LABELS[contentType] || 'marketing copy';
   const toneLabel = TONE_LABELS[tone] || 'Confident, premium, understated (Razariser\'s default voice)';
- 
+
   const FRAMEWORK_GUIDANCE = {
     product_description: 'Lead with the strongest concrete benefit, not a feature list. Use sensory, specific language (fabric feel, fit, occasion) over generic adjectives like "amazing" or "premium" used alone — show premium, don\'t just claim it.',
     instagram_caption: 'Hook in the first line — it\'s what shows before "more." Use AIDA (Attention, Interest, Desire, Action): open with a scroll-stopping line, build interest with one concrete detail, create desire by painting the moment of wearing it, end with a clear next step.',
@@ -2158,7 +2239,7 @@ async function handleMarketingContent(req, res) {
     abandoned_cart: 'One clear reason to come back — remind, don\'t guilt-trip. No fake urgency ("only 2 left!") unless it\'s real. A single clear link/action, not a wall of upsells.',
     wishlist_reminder: 'Light touch, not a hard sell — this person already showed interest, the job is a gentle nudge, not pressure. Reference the act of saving it, not a fabricated reason it\'s special now.',
   };
- 
+
   const systemInstruction = {
     parts: [{
       text:
@@ -2178,23 +2259,23 @@ async function handleMarketingContent(req, res) {
         '{"variants": ["variant 1 full text", "variant 2 full text", "variant 3 full text"]}',
     }],
   };
- 
+
   const userText = productName ? `Product: ${productName}\n\nBrief: ${brief}` : `Brief: ${brief}`;
- 
+
   const startTime = Date.now();
   const geminiRes = await fetchGeminiWithRetry({ system_instruction: systemInstruction, contents: [{ role: 'user', parts: [{ text: userText }] }] });
- 
+
   if (!geminiRes.ok) {
     const errText = await geminiRes.text();
     console.error('marketing-content: Gemini API error:', geminiRes.status, errText);
     logAiUsage('content-studio', 'CMO', false, `Gemini ${geminiRes.status}`, null, null, Date.now() - startTime);
     return res.status(502).json({ error: `AI service error (${geminiRes.status}). Try again in a moment.` });
   }
- 
+
   const data = await geminiRes.json();
   const text = data.candidates?.[0]?.content?.parts?.map((p) => p.text || '').join('') || '';
   const cleaned = text.replace(/```json|```/g, '').trim();
- 
+
   let variants;
   try {
     const parsed = JSON.parse(cleaned);
@@ -2205,7 +2286,7 @@ async function handleMarketingContent(req, res) {
     variants = [text || 'No content generated.'];
   }
   logAiUsage('content-studio', 'CMO', true, null, data.usageMetadata?.promptTokenCount, data.usageMetadata?.candidatesTokenCount, Date.now() - startTime);
- 
+
   // Log every generation for the Content Log — the honest version of
   // "performance tracking" available here: a real historical record the
   // admin can mark as published and annotate with actual outcomes, since
@@ -2220,10 +2301,10 @@ async function handleMarketingContent(req, res) {
   } catch (err) {
     console.error('marketing-content: content log insert failed:', err.message);
   }
- 
+
   return res.status(200).json({ variants, logIds });
 }
- 
+
 /* ── Content Log: the honest version of "performance tracking" — a real
    history of every generated piece, which the admin can mark as actually
    published and annotate with real outcomes they observed. Not automated
@@ -2239,7 +2320,7 @@ async function handleContentLogList(req, res) {
   if (error) throw error;
   return res.status(200).json({ entries: data || [] });
 }
- 
+
 async function handleContentLogUpdate(req, res) {
   const session = requireAuth(req, res);
   if (!session) return;
@@ -2255,23 +2336,23 @@ async function handleContentLogUpdate(req, res) {
   if (error) throw error;
   return res.status(200).json({ success: true });
 }
- 
+
 async function handleMarketingCampaign(req, res) {
   const session = requireAuth(req, res);
   if (!session) return;
- 
+
   if (!GEMINI_API_KEY) {
     return res.status(500).json({ error: 'GEMINI_API_KEY is not set in Vercel environment variables.' });
   }
- 
+
   const { campaignType, goal, notes } = req.body || {};
   if (!campaignType || !goal) {
     return res.status(400).json({ error: 'campaignType and goal are required.' });
   }
- 
+
   const context = await buildMarketingContext();
   const contextText = marketingContextToPromptText(context);
- 
+
   const systemInstruction = {
     parts: [{
       text:
@@ -2291,23 +2372,23 @@ async function handleMarketingCampaign(req, res) {
         '"channels": ["..."], "contentIdeas": ["...", "..."], "estimateNote": "one sentence, clearly caveated as illustrative", "steps": ["...", "..."]}',
     }],
   };
- 
+
   const userText = `Campaign type: ${campaignType}\nGoal: ${goal}${notes ? `\nAdditional notes: ${notes}` : ''}`;
- 
+
   const startTime = Date.now();
   const geminiRes = await fetchGeminiWithRetry({ system_instruction: systemInstruction, contents: [{ role: 'user', parts: [{ text: userText }] }] });
- 
+
   if (!geminiRes.ok) {
     const errText = await geminiRes.text();
     console.error('marketing-campaign: Gemini API error:', geminiRes.status, errText);
     logAiUsage('campaign-planner', 'CMO', false, `Gemini ${geminiRes.status}`, null, null, Date.now() - startTime);
     return res.status(502).json({ error: `AI service error (${geminiRes.status}). Try again in a moment.` });
   }
- 
+
   const data = await geminiRes.json();
   const text = data.candidates?.[0]?.content?.parts?.map((p) => p.text || '').join('') || '';
   const cleaned = text.replace(/```json|```/g, '').trim();
- 
+
   let plan;
   try {
     plan = JSON.parse(cleaned);
@@ -2316,11 +2397,11 @@ async function handleMarketingCampaign(req, res) {
     logAiUsage('campaign-planner', 'CMO', false, 'parse error', data.usageMetadata?.promptTokenCount, data.usageMetadata?.candidatesTokenCount, Date.now() - startTime);
     return res.status(502).json({ error: 'AI returned an unexpected format. Try again.' });
   }
- 
+
   logAiUsage('campaign-planner', 'CMO', true, null, data.usageMetadata?.promptTokenCount, data.usageMetadata?.candidatesTokenCount, Date.now() - startTime);
   return res.status(200).json({ plan });
 }
- 
+
 /* ── Marketing Strategy: a persistent, comprehensive strategic document —
    not a single campaign, not a daily brief. Synthesizes all real available
    data into a stage-appropriate direction. Explicitly reasons about
@@ -2332,14 +2413,14 @@ async function handleMarketingStrategyGenerate(req, res) {
   if (!GEMINI_API_KEY) {
     return res.status(500).json({ error: 'GEMINI_API_KEY is not set in Vercel environment variables.' });
   }
- 
+
   const context = await buildMarketingContext();
   const contextText = marketingContextToPromptText(context);
- 
+
   const stageNote = context.orders.hasData
     ? `Razariser has ${context.orders.count} real orders — some revenue history exists to reason from.`
     : 'Razariser has ZERO orders so far. This is a pre-revenue stage. A real strategy for this stage prioritizes getting first sales and validating real demand — NOT scaling, retention loops, LTV optimization, or paid acquisition at volume. Say this plainly in the strategy rather than writing generic growth-marketing advice that assumes a functioning funnel.';
- 
+
   const systemInstruction = {
     parts: [{
       text:
@@ -2363,7 +2444,7 @@ async function handleMarketingStrategyGenerate(req, res) {
         '"assumptions": ["explicit list of what this strategy assumes, so it\'s clear what would change it"]}',
     }],
   };
- 
+
   const startTime = Date.now();
   const geminiRes = await fetchGeminiWithRetry({ system_instruction: systemInstruction, contents: [{ role: 'user', parts: [{ text: 'Generate the strategy.' }] }] });
   if (!geminiRes.ok) {
@@ -2372,11 +2453,11 @@ async function handleMarketingStrategyGenerate(req, res) {
     logAiUsage('strategy-generate', 'CMO', false, `Gemini ${geminiRes.status}`, null, null, Date.now() - startTime);
     return res.status(502).json({ error: `AI service error (${geminiRes.status}). Try again in a moment.` });
   }
- 
+
   const data = await geminiRes.json();
   const text = data.candidates?.[0]?.content?.parts?.map((p) => p.text || '').join('') || '';
   const cleaned = text.replace(/```json|```/g, '').trim();
- 
+
   let strategy;
   try {
     strategy = JSON.parse(cleaned);
@@ -2385,19 +2466,19 @@ async function handleMarketingStrategyGenerate(req, res) {
     logAiUsage('strategy-generate', 'CMO', false, 'parse error', data.usageMetadata?.promptTokenCount, data.usageMetadata?.candidatesTokenCount, Date.now() - startTime);
     return res.status(502).json({ error: 'AI returned an unexpected format. Try again.' });
   }
- 
+
   logAiUsage('strategy-generate', 'CMO', true, null, data.usageMetadata?.promptTokenCount, data.usageMetadata?.candidatesTokenCount, Date.now() - startTime);
- 
+
   const { data: saved, error } = await supabase
     .from('marketing_strategy_versions')
     .insert({ content: strategy })
     .select('id, created_at')
     .single();
   if (error) console.error('marketing-strategy: save failed:', error.message);
- 
+
   return res.status(200).json({ strategy, id: saved?.id, createdAt: saved?.created_at });
 }
- 
+
 async function handleMarketingStrategyLatest(req, res) {
   const session = requireAuth(req, res);
   if (!session) return;
@@ -2411,7 +2492,7 @@ async function handleMarketingStrategyLatest(req, res) {
   if (!data) return res.status(200).json({ strategy: null });
   return res.status(200).json({ strategy: data.content, id: data.id, createdAt: data.created_at });
 }
- 
+
 async function handleMarketingStrategyHistory(req, res) {
   const session = requireAuth(req, res);
   if (!session) return;
@@ -2423,7 +2504,7 @@ async function handleMarketingStrategyHistory(req, res) {
   if (error) throw error;
   return res.status(200).json({ versions: data || [] });
 }
- 
+
 /* ── Market Research: real web search, via Gemini's google_search grounding
    tool — actual current information from the live internet, with real
    source links, not the model's training-data guesses. Kept as a SEPARATE
@@ -2442,7 +2523,7 @@ async function handleMarketingResearch(req, res) {
   if (!question || !question.trim()) {
     return res.status(400).json({ error: 'question is required.' });
   }
- 
+
   const systemInstruction = {
     parts: [{
       text:
@@ -2454,13 +2535,13 @@ async function handleMarketingResearch(req, res) {
         'attempt to deeply profile or scrape data about a specific named competitor business.',
     }],
   };
- 
+
   const body = {
     system_instruction: systemInstruction,
     contents: [{ role: 'user', parts: [{ text: question }] }],
     tools: [{ google_search: {} }],
   };
- 
+
   const startTime = Date.now();
   const geminiRes = await fetchGeminiWithRetry(body);
   if (!geminiRes.ok) {
@@ -2469,46 +2550,46 @@ async function handleMarketingResearch(req, res) {
     logAiUsage('market-research', 'CMO', false, `Gemini ${geminiRes.status}`, null, null, Date.now() - startTime);
     return res.status(502).json({ error: `AI service error (${geminiRes.status}). Try again in a moment.` });
   }
- 
+
   const data = await geminiRes.json();
   const candidate = data.candidates?.[0];
   const answer = candidate?.content?.parts?.map((p) => p.text || '').join('') || 'No response generated.';
- 
+
   const groundingChunks = candidate?.groundingMetadata?.groundingChunks || [];
   const sources = groundingChunks
     .map((c) => c.web ? { title: c.web.title, uri: c.web.uri } : null)
     .filter(Boolean);
   const searchQueries = candidate?.groundingMetadata?.webSearchQueries || [];
- 
+
   logAiUsage('market-research', 'CMO', true, null, data.usageMetadata?.promptTokenCount, data.usageMetadata?.candidatesTokenCount, Date.now() - startTime);
   return res.status(200).json({ answer, sources, searchQueries });
 }
- 
+
 /* ── AI Control Center: the real version of what was asked for. Covers
    what actually exists (Gemini-based personas, real automations, real
    Telegram bots) — no GPU monitor, no NVIDIA model cards, no fake hardware
    data, since none of that infrastructure exists on this stack. ── */
- 
+
 const GEMINI_PRICE_PER_M_INPUT = 0.10; // USD, gemini-2.5-flash-lite, confirmed current as of this build
 const GEMINI_PRICE_PER_M_OUTPUT = 0.40;
- 
+
 async function handleAiControlOverview(req, res) {
   const session = requireAuth(req, res);
   if (!session) return;
   if (session.role !== 'super_admin') return res.status(403).json({ error: 'Super Admin only.' });
- 
+
   const since7d = new Date(Date.now() - 7 * 86400000).toISOString();
   const since30d = new Date(Date.now() - 30 * 86400000).toISOString();
- 
+
   const { data: logs30d } = await supabase
     .from('ai_usage_logs')
     .select('feature, persona, success, tokens_in, tokens_out, latency_ms, created_at')
     .gte('created_at', since30d)
     .limit(5000);
- 
+
   const rows = logs30d || [];
   const rows7d = rows.filter((r) => r.created_at >= since7d);
- 
+
   const summarize = (set) => {
     const total = set.length;
     const successes = set.filter((r) => r.success).length;
@@ -2518,12 +2599,12 @@ async function handleAiControlOverview(req, res) {
     const estCost = (tokensIn / 1e6) * GEMINI_PRICE_PER_M_INPUT + (tokensOut / 1e6) * GEMINI_PRICE_PER_M_OUTPUT;
     return { total, successRate: total ? Math.round((successes / total) * 100) : null, tokensIn, tokensOut, avgLatencyMs: avgLatency, estimatedCostUsd: Math.round(estCost * 10000) / 10000 };
   };
- 
+
   const byFeature = {};
   rows.forEach((r) => { byFeature[r.feature] = (byFeature[r.feature] || 0) + 1; });
   const byPersona = {};
   rows.forEach((r) => { if (r.persona) byPersona[r.persona] = (byPersona[r.persona] || 0) + 1; });
- 
+
   return res.status(200).json({
     last7Days: summarize(rows7d),
     last30Days: summarize(rows),
@@ -2533,19 +2614,19 @@ async function handleAiControlOverview(req, res) {
     note: 'gemini-2.5-flash-lite is scheduled for retirement by Google on 2026-10-16 — will need a model-string update before then.',
   });
 }
- 
+
 async function handleAiControlAgents(req, res) {
   const session = requireAuth(req, res);
   if (!session) return;
   if (session.role !== 'super_admin') return res.status(403).json({ error: 'Super Admin only.' });
- 
+
   const since30d = new Date(Date.now() - 30 * 86400000).toISOString();
   const { data: logs } = await supabase.from('ai_usage_logs').select('persona, success, created_at').gte('created_at', since30d).limit(5000);
   const { data: activeRoleRows } = await supabase.from('admin_active_roles').select('role_title');
   const activeSet = new Set((activeRoleRows || []).map((r) => r.role_title));
   const { data: telegramRows } = await supabase.from('telegram_role_bots').select('role_title, chat_id');
   const telegramConnected = new Set((telegramRows || []).filter((r) => r.chat_id).map((r) => r.role_title));
- 
+
   const allPersonas = ['personal', ...ORG_TITLES];
   const agents = allPersonas.map((p) => {
     const relevant = (logs || []).filter((l) => l.persona === p);
@@ -2561,15 +2642,15 @@ async function handleAiControlAgents(req, res) {
       hasTools: p === 'personal' ? true : !!ROLE_TOOL_NAMES[p],
     };
   });
- 
+
   return res.status(200).json({ agents });
 }
- 
+
 async function handleAiControlLogs(req, res) {
   const session = requireAuth(req, res);
   if (!session) return;
   if (session.role !== 'super_admin') return res.status(403).json({ error: 'Super Admin only.' });
- 
+
   const { data, error } = await supabase
     .from('ai_usage_logs')
     .select('feature, persona, success, error_message, tokens_in, tokens_out, latency_ms, created_at')
@@ -2578,46 +2659,46 @@ async function handleAiControlLogs(req, res) {
   if (error) throw error;
   return res.status(200).json({ logs: data || [] });
 }
- 
+
 async function handleAiControlHealth(req, res) {
   const session = requireAuth(req, res);
   if (!session) return;
   if (session.role !== 'super_admin') return res.status(403).json({ error: 'Super Admin only.' });
- 
+
   const checks = [];
- 
+
   checks.push({ name: 'Gemini API key', status: GEMINI_API_KEY ? 'healthy' : 'offline', detail: GEMINI_API_KEY ? 'Configured' : 'GEMINI_API_KEY not set' });
- 
+
   try {
     const { error } = await supabase.from('admins').select('id', { count: 'exact', head: true });
     checks.push({ name: 'Database', status: error ? 'offline' : 'healthy', detail: error ? error.message : 'Reachable' });
   } catch (err) {
     checks.push({ name: 'Database', status: 'offline', detail: err.message });
   }
- 
+
   const { data: telegramRows } = await supabase.from('telegram_role_bots').select('role_title, chat_id');
   const connectedBots = (telegramRows || []).filter((r) => r.chat_id).length;
   checks.push({ name: 'Telegram bots', status: connectedBots > 0 ? 'healthy' : 'warning', detail: `${connectedBots} of 12 role bots connected` });
- 
+
   const since2d = new Date(Date.now() - 2 * 86400000).toISOString();
   const { data: recentCronLogs } = await supabase.from('ai_usage_logs').select('feature, success, created_at').like('feature', 'cron-%').gte('created_at', since2d).order('created_at', { ascending: false }).limit(20);
   const cronRan = (recentCronLogs || []).length > 0;
   checks.push({ name: 'Cron automations', status: cronRan ? 'healthy' : 'warning', detail: cronRan ? `Last ran ${recentCronLogs[0].created_at}` : 'No cron activity logged in the last 2 days — check vercel.json is deployed with the cron entries' });
- 
+
   checks.push({ name: 'NVIDIA / GPU', status: 'offline', detail: 'Not connected — no NVIDIA integration or GPU hardware exists in this deployment' });
- 
+
   return res.status(200).json({ checks });
 }
- 
+
 module.exports = async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
- 
+
   if (req.method === 'OPTIONS') return res.status(200).end();
- 
+
   const action = req.query.action || (req.body && req.body.action);
- 
+
   try {
     if (req.method === 'POST' && action === 'login') return await handleLogin(req, res);
     if (req.method === 'POST' && action === 'update-location') return await handleUpdateLocation(req, res);
@@ -2629,6 +2710,7 @@ module.exports = async function handler(req, res) {
     if (req.method === 'GET' && action === 'maintenance-status') return await handleMaintenanceStatus(req, res);
     if (req.method === 'POST' && action === 'maintenance-toggle') return await handleMaintenanceToggle(req, res);
     if (req.method === 'GET' && action === 'maintenance-history') return await handleMaintenanceHistory(req, res);
+    if (req.method === 'POST' && action === 'maintenance-webhook') return await handleMaintenanceTelegramWebhook(req, res);
     if (req.method === 'POST' && action === 'face-challenge-verify') return await handleFaceChallengeVerify(req, res);
     if (req.method === 'POST' && action === 'face-enroll-self') return await handleFaceEnrollSelf(req, res);
     if (req.method === 'POST' && action === 'face-enroll-for-admin') return await handleFaceEnrollForAdmin(req, res);
@@ -2674,4 +2756,3 @@ module.exports = async function handler(req, res) {
     return res.status(500).json({ error: err.message || 'Unexpected server error.' });
   }
 };
- 
