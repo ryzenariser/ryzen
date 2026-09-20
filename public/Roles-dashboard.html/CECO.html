@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="robots" content="noindex, nofollow" />
+<title>CECO Dashboard — Razariser</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=Montserrat:wght@600;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="_shared.css" />
+</head>
+<body>
+<div id="rd-app"></div>
+<script src="_shared.js"></script>
+<script>
+// CECO dashboard. Data comes from Roles-dashboard.js/CECO.js via
+// /api/admin?action=role-dashboard — this file only decides how it looks.
+RD.boot({
+  role: 'CECO',
+  render: function (d) {
+    var R = RD, esc = R.esc, inr = R.inr, num = R.num, pct = R.pct, ago = R.ago, html = R.html, when = R.when;
+    var tiles = R.grid([
+      R.stat('Website pages', d.pages ? num(d.pages.total) : '—'),
+      R.stat('Page views', d.pageViews ? num(d.pageViews.count) : '—'),
+      R.stat('Items in carts', num(d.cartItems)),
+      R.stat('Wishlist items', num(d.wishlistItems)),
+      R.stat('Payments', d.payments.razorpayWebhookConfigured ? 'Razorpay connected' : 'Not connected', '', d.payments.razorpayWebhookConfigured ? 'ok' : 'bad'),
+    ]);
+    var checkout = R.na(d.checkout, function (c) {
+      if (!c.started) return R.empty('No checkouts started yet.');
+      return R.grid([
+        R.stat('Checkouts started', num(c.started)),
+        R.stat('Completed', num(c.completed), '', 'ok'),
+        R.stat('Left unpaid', num(c.abandoned), '', c.abandoned ? 'warn' : ''),
+        R.stat('Completion rate', pct(c.completionRate), '', c.completionRate != null && c.completionRate < 50 ? 'warn' : 'ok'),
+      ]);
+    }, 'Checkout data');
+    var types = R.na(d.pages, function (p) { return R.bars(p.byType.map(function (t) { return { label: t.label, value: t.count }; }), 'No pages yet.'); }, 'Pages');
+    var latest = R.na(d.pages, function (p) { return R.table(['Page', 'Address', 'Type'], p.latest.map(function (x) { return [x.title || '—', '/' + (x.slug || ''), x.type || '—']; }), 'No pages yet.'); }, 'Pages');
+    var top = R.na(d.pageViews, function (p) { return R.bars(p.topPaths.map(function (t) { return { label: t.path, value: t.views }; }), 'No page views recorded yet.'); }, 'Traffic');
+    return tiles + R.section('Checkout completion', checkout, 'From real orders') +
+      R.cols(2, [R.section('Most visited pages', top), R.section('Pages by type', types)]) +
+      R.section('Latest pages', latest, 'Newest first');
+  }
+});
+</script>
+</body>
+</html>

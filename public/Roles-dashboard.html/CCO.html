@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="robots" content="noindex, nofollow" />
+<title>CCO Dashboard — Razariser</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=Montserrat:wght@600;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="_shared.css" />
+</head>
+<body>
+<div id="rd-app"></div>
+<script src="_shared.js"></script>
+<script>
+// CCO dashboard. Data comes from Roles-dashboard.js/CCO.js via
+// /api/admin?action=role-dashboard — this file only decides how it looks.
+RD.boot({
+  role: 'CCO',
+  render: function (d) {
+    var R = RD, esc = R.esc, inr = R.inr, num = R.num, pct = R.pct, ago = R.ago, html = R.html, when = R.when;
+    var o = d.orders;
+    var tiles = R.grid([
+      R.stat('Registered customers', num(d.customers)),
+      R.stat('Items in carts', num(d.cartItems)),
+      R.stat('Wishlist items', num(d.wishlistItems)),
+      R.stat('Delivered orders', o ? num(o.delivered) : '—', '', 'ok'),
+      R.stat('Orders that went wrong', o ? pct(o.problemRate) : '—', 'Cancelled or refunded', o && o.problemRate ? 'warn' : ''),
+    ]);
+    var health = R.na(o, function (x) {
+      return R.bars([
+        { label: 'Delivered', value: x.delivered, tone: 'ok' },
+        { label: 'Never paid', value: x.neverPaid, tone: 'warn' },
+        { label: 'Cancelled', value: x.cancelled, tone: 'bad', text: x.cancelled + ' · ' + inr(x.cancelledValue) },
+        { label: 'Refunded', value: x.refunded, tone: 'bad', text: x.refunded + ' · ' + inr(x.refundedValue) },
+      ]);
+    }, 'Order data');
+    var problems = R.na(o, function (x) {
+      return R.table(['Placed', 'Status', {label: 'Amount', num: true}], x.recentProblems.map(function (p) { return [ago(p.createdAt), R.statusPill(p.status), inr(p.amount)]; }), 'No cancelled or refunded orders.');
+    }, 'Order data');
+    return tiles + R.cols(2, [R.section('Order outcomes', health), R.section('Latest cancellations and refunds', problems)]);
+  }
+});
+</script>
+</body>
+</html>

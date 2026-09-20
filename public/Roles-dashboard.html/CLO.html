@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="robots" content="noindex, nofollow" />
+<title>CLO Dashboard — Razariser</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=Montserrat:wght@600;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="_shared.css" />
+</head>
+<body>
+<div id="rd-app"></div>
+<script src="_shared.js"></script>
+<script>
+// CLO dashboard. Data comes from Roles-dashboard.js/CLO.js via
+// /api/admin?action=role-dashboard — this file only decides how it looks.
+RD.boot({
+  role: 'CLO',
+  render: function (d) {
+    var R = RD, esc = R.esc, inr = R.inr, num = R.num, pct = R.pct, ago = R.ago, html = R.html, when = R.when;
+    var policies = R.na(d.policies, function (list) {
+      return R.table(['Policy page', 'On the site?'], list.map(function (p) {
+        return [p.label, html(p.found ? R.pill('Found: /' + p.slug, 'ok') : R.pill('Not found', 'warn'))];
+      }));
+    }, 'Policy pages');
+    var access = R.na(d.access, function (list) {
+      return R.table(['Sub-admin', 'Seat', 'Can delete in', 'Can edit in', 'Manages admins'], list.map(function (a) {
+        return [a.username, a.seat || '—', a.canDelete.join(', ') || '—', a.canEdit.join(', ') || '—', a.manageAdmins ? html(R.pill('Yes', 'warn')) : 'No'];
+      }), 'No sub-admins yet.');
+    }, 'Access data');
+    var audit = R.na(d.audit, function (a) {
+      var t = R.grid([R.stat('Sign-in attempts', num(a.total), 'Last 30 days'), R.stat('Failed', num(a.failed), '', a.failed ? 'warn' : 'ok')]);
+      var rows = R.table(['When', 'Username', 'Result'], a.recent.map(function (r) { return [when(r.at), r.username || '—', html(r.success ? R.pill('Success', 'ok') : R.pill('Failed', 'bad'))]; }), 'No sign-ins recorded.');
+      return t + '<div style="height:14px"></div>' + rows;
+    }, 'Audit trail');
+    return R.section('Storefront policy pages', policies, 'Matched against real page names') +
+      R.section('Who can change or delete things', access, 'Real permissions on each account') +
+      R.section('Admin access audit trail', audit, 'Times and usernames only');
+  }
+});
+</script>
+</body>
+</html>

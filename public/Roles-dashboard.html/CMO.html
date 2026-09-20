@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="robots" content="noindex, nofollow" />
+<title>CMO Dashboard — Razariser</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=Montserrat:wght@600;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="_shared.css" />
+</head>
+<body>
+<div id="rd-app"></div>
+<script src="_shared.js"></script>
+<script>
+// CMO dashboard. Data comes from Roles-dashboard.js/CMO.js via
+// /api/admin?action=role-dashboard — this file only decides how it looks.
+RD.boot({
+  role: 'CMO',
+  render: function (d) {
+    var R = RD, esc = R.esc, inr = R.inr, num = R.num, pct = R.pct, ago = R.ago, html = R.html, when = R.when;
+    var tiles = R.grid([
+      R.stat('Registered customers', num(d.customers)),
+      R.stat('Page views', d.pageViews ? num(d.pageViews.count) : '—'),
+      R.stat('Items in carts', num(d.cartItems)),
+      R.stat('Wishlist items', num(d.wishlistItems)),
+      R.stat('Paid orders', d.orders ? num(d.orders.paid) : '—', d.orders ? inr(d.orders.revenue) + ' revenue' : ''),
+    ]);
+    var top = R.na(d.pageViews, function (p) { return R.bars(p.topPaths.map(function (t) { return { label: t.path, value: t.views }; }), 'No page views recorded yet.'); }, 'Traffic');
+    var cat = R.na(d.catalog, function (c) { return R.bars(c.byCategory.map(function (x) { return { label: x.label, value: x.count }; }), 'No products yet.'); }, 'Catalog');
+    var tools = R.note('The Marketing Director AI (daily brief, campaign plans, content, brand-voice check, forecast) lives in the <a href="/admin.html" style="color:var(--gold-l)">Marketing tab</a> of the admin panel.');
+    return tiles + R.cols(2, [R.section('Most visited pages', top, 'All recorded views'), R.section('What you have to market', cat, d.catalog ? d.catalog.total + ' products' : '')]) + R.section('AI marketing tools', tools);
+  }
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="robots" content="noindex, nofollow" />
+<title>CPO Dashboard — Razariser</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=Montserrat:wght@600;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="_shared.css" />
+</head>
+<body>
+<div id="rd-app"></div>
+<script src="_shared.js"></script>
+<script>
+// CPO dashboard. Data comes from Roles-dashboard.js/CPO.js via
+// /api/admin?action=role-dashboard — this file only decides how it looks.
+RD.boot({
+  role: 'CPO',
+  render: function (d) {
+    var R = RD, esc = R.esc, inr = R.inr, num = R.num, pct = R.pct, ago = R.ago, html = R.html, when = R.when;
+    return R.na(d.catalog, function (c) {
+      var sync = d.inSync === null ? '' : R.pill(d.inSync ? 'Catalog file and products table agree' : 'Catalog file has ' + c.total + ', products table has ' + d.tableCount, d.inSync ? 'ok' : 'warn');
+      var tiles = R.grid([
+        R.stat('Products', num(c.total), c.unpriced ? c.unpriced + ' without a price' : '', c.unpriced ? 'warn' : ''),
+        R.stat('Average price', c.price.avg != null ? inr(c.price.avg) : '—'),
+        R.stat('Median price', c.price.median != null ? inr(c.price.median) : '—'),
+        R.stat('Price range', c.price.min != null ? inr(c.price.min) + ' – ' + inr(c.price.max) : '—'),
+        R.stat('Without a badge', num(c.withoutBadge)),
+      ]);
+      var cat = R.bars(c.byCategory.map(function (x) { return { label: x.label, value: x.count }; }));
+      var bands = R.bars(c.bands.map(function (b) { return { label: b.label, value: b.count }; }));
+      var badges = R.bars(c.byBadge.map(function (b) { return { label: b.label, value: b.count }; }), 'No product has a badge yet.');
+      var priceRows = function (list) { return R.table(['Product', 'Category', {label: 'Price', num: true}], list.map(function (p) { return [p.name, p.category, inr(p.price)]; })); };
+      return '<div style="margin-bottom:14px">' + sync + '</div>' + tiles +
+        R.cols(2, [R.section('Collections', cat, 'Products per category'), R.section('Pricing bands', bands)]) +
+        R.cols(2, [R.section('Highest priced', priceRows(c.priciest)), R.section('Lowest priced', priceRows(c.cheapest))]) +
+        R.section('Badges', badges);
+    }, 'The catalog');
+  }
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="robots" content="noindex, nofollow" />
+<title>CDO (Design) Dashboard — Razariser</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=Montserrat:wght@600;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="_shared.css" />
+</head>
+<body>
+<div id="rd-app"></div>
+<script src="_shared.js"></script>
+<script>
+// CDO (Design) dashboard. Data comes from Roles-dashboard.js/CDO-Design.js via
+// /api/admin?action=role-dashboard — this file only decides how it looks.
+RD.boot({
+  role: 'CDO (Design)',
+  render: function (d) {
+    var R = RD, esc = R.esc, inr = R.inr, num = R.num, pct = R.pct, ago = R.ago, html = R.html, when = R.when;
+    return R.na(d.catalog, function (c) {
+      var tiles = R.grid([
+        R.stat('Designs in the catalog', num(c.total)),
+        R.stat('Categories', num(c.categories.length)),
+        R.stat('With a badge', num(c.total - c.withoutBadge), 'New, best seller and similar'),
+        R.stat('No badge', num(c.withoutBadge)),
+      ]);
+      var mix = R.bars(c.categories.map(function (x) { return { label: x.label, value: x.count }; }));
+      var badges = R.bars(c.byBadge.map(function (b) { return { label: b.label, value: b.count }; }), 'No product has a badge yet.');
+      var lists = c.categories.map(function (cat) {
+        return R.section(cat.label, R.table(['Piece', 'Badge', {label: 'Price', num: true}], cat.items.map(function (i) { return [i.name, i.badge || '—', i.price ? inr(i.price) : '—']; })), cat.count > cat.items.length ? 'Showing ' + cat.items.length + ' of ' + cat.count : cat.count + ' pieces');
+      }).join('');
+      return tiles + R.cols(2, [R.section('Range by category', mix), R.section('Badges in use', badges)]) + lists;
+    }, 'The catalog');
+  }
+});
+</script>
+</body>
+</html>

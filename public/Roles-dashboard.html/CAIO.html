@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="robots" content="noindex, nofollow" />
+<title>CAIO Dashboard — Razariser</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=Montserrat:wght@600;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="_shared.css" />
+</head>
+<body>
+<div id="rd-app"></div>
+<script src="_shared.js"></script>
+<script>
+// CAIO dashboard. Data comes from Roles-dashboard.js/CAIO.js via
+// /api/admin?action=role-dashboard — this file only decides how it looks.
+RD.boot({
+  role: 'CAIO',
+  render: function (d) {
+    var R = RD, esc = R.esc, inr = R.inr, num = R.num, pct = R.pct, ago = R.ago, html = R.html, when = R.when;
+    var u = d.usage;
+    var tiles = R.grid([
+      R.stat('Gemini', d.geminiConfigured ? 'Connected' : 'Not connected', '', d.geminiConfigured ? 'ok' : 'bad'),
+      R.stat('AI requests', u ? num(u.requests) : '—', 'Last 30 days'),
+      R.stat('Success rate', u ? pct(u.successRate) : '—', '', u && u.successRate != null && u.successRate < 90 ? 'warn' : ''),
+      R.stat('Average response', u && u.avgLatencyMs != null ? (u.avgLatencyMs / 1000).toFixed(1) + ' s' : '—'),
+      R.stat('Tokens used', u ? num(u.tokensIn + u.tokensOut) : '—', u ? num(u.tokensIn) + ' in, ' + num(u.tokensOut) + ' out' : ''),
+    ]);
+    var persona = R.na(u, function (x) {
+      return R.table(['Assistant', {label: 'Requests', num: true}, {label: 'Success', num: true}], x.byPersona.map(function (p) { return [p.persona === 'personal' ? 'Personal Assistant' : p.persona, num(p.requests), pct(p.successRate)]; }), 'No AI usage logged yet.');
+    }, 'AI usage');
+    var feature = R.na(u, function (x) { return R.bars(x.byFeature.map(function (f) { return { label: f.label, value: f.count }; }), 'No AI usage logged yet.'); }, 'AI usage');
+    var active = R.na(d.activeRoles, function (list) { return R.bars(list.map(function (r) { return { label: r.label, value: r.count, text: r.count + (r.count === 1 ? ' person' : ' people') }; }), 'No role assistants are switched on.'); }, 'Role assistants');
+    var infra = R.grid([
+      R.stat('Telegram bots live', d.telegram ? d.telegram.connected + ' of ' + d.telegram.total : '—'),
+      R.stat('Face recognition', d.face ? d.face.enrolled + ' of ' + d.face.accounts : '—', 'Accounts enrolled', d.face && d.face.enrolled < d.face.accounts ? 'warn' : ''),
+    ]);
+    var fails = R.na(u, function (x) {
+      return R.table(['When', 'Feature', 'Error'], x.recentFailures.map(function (f) { return [ago(f.at), f.feature, f.message || '—']; }), 'No failed AI requests in the last 30 days.');
+    }, 'AI failures');
+    return tiles + R.cols(2, [R.section('Usage by assistant', persona, 'Last 30 days'), R.section('Usage by feature', feature, 'Last 30 days')]) +
+      R.cols(2, [R.section('Role assistants switched on', active), R.section('AI infrastructure', infra)]) +
+      R.section('Recent AI failures', fails);
+  }
+});
+</script>
+</body>
+</html>

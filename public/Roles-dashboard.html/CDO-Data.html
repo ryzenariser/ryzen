@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="robots" content="noindex, nofollow" />
+<title>CDO (Data) Dashboard — Razariser</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=Montserrat:wght@600;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="_shared.css" />
+</head>
+<body>
+<div id="rd-app"></div>
+<script src="_shared.js"></script>
+<script>
+// CDO (Data) dashboard. Data comes from Roles-dashboard.js/CDO-Data.js via
+// /api/admin?action=role-dashboard — this file only decides how it looks.
+RD.boot({
+  role: 'CDO (Data)',
+  render: function (d) {
+    var R = RD, esc = R.esc, inr = R.inr, num = R.num, pct = R.pct, ago = R.ago, html = R.html, when = R.when;
+    var tables = R.table(['Data', {label: 'Rows', num: true}], d.tables.map(function (t) { return [t.label, t.rows === null ? html(R.pill('Unreadable', 'warn')) : num(t.rows)]; }));
+    var orders = R.na(d.orders, function (o) {
+      var f = o.forecast;
+      var tiles = R.grid([
+        R.stat('Paid orders, last 14 days', num(o.last14.orders), R.change(o.last14.orders, o.prev14.orders)),
+        R.stat('Revenue, last 14 days', inr(o.last14.revenue), R.change(o.last14.revenue, o.prev14.revenue)),
+        R.stat('Forecasting', f.ready ? 'Ready' : 'Not yet', f.have + ' of ' + f.need + ' orders needed', f.ready ? 'ok' : 'warn'),
+      ]);
+      var chart = o.paidCount ? R.trend(o.trend30, 'orders', num) : R.empty('No paid orders yet, so there is no trend to draw.');
+      return tiles + R.cols(2, [R.section('Paid orders per day', chart, 'Last 30 days'), R.section('Orders by status', R.statusBars(o.byStatus))]);
+    }, 'Order data');
+    var paths = R.na(d.topPaths, function (p) { return R.bars(p.map(function (t) { return { label: t.path, value: t.views }; }), 'No page views recorded yet.'); }, 'Traffic');
+    return orders + R.cols(2, [R.section('What data exists', tables, 'Row counts per table'), R.section('Most visited pages', paths)]);
+  }
+});
+</script>
+</body>
+</html>

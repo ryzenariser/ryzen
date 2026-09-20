@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="robots" content="noindex, nofollow" />
+<title>CHRO Dashboard — Razariser</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=Montserrat:wght@600;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="_shared.css" />
+</head>
+<body>
+<div id="rd-app"></div>
+<script src="_shared.js"></script>
+<script>
+// CHRO dashboard. Data comes from Roles-dashboard.js/CHRO.js via
+// /api/admin?action=role-dashboard — this file only decides how it looks.
+RD.boot({
+  role: 'CHRO',
+  render: function (d) {
+    var R = RD, esc = R.esc, inr = R.inr, num = R.num, pct = R.pct, ago = R.ago, html = R.html, when = R.when;
+    if (!d.staff) return R.empty("The team list couldn't be loaded right now. Tap Refresh to try again.");
+    var filled = d.seats.filter(function (s) { return s.holder; }).length;
+    var tiles = R.grid([
+      R.stat('Active accounts', num(d.counts.activeAccounts), 'Including the Board of Directors'),
+      R.stat('Sub-admins', num(d.counts.subAdmins)),
+      R.stat('Seats filled', filled + ' of ' + d.seats.length, '', filled < d.seats.length ? 'warn' : 'ok'),
+      R.stat('Sub-admins without a seat', num(d.counts.withoutSeat), 'They see the standard admin panel', d.counts.withoutSeat ? 'warn' : 'ok'),
+      R.stat('Deactivated', num(d.counts.deactivated)),
+    ]);
+    var seats = R.table(['Seat', 'Held by'], d.seats.map(function (s) { return [s.title, s.holder ? s.holder : html(R.pill('Vacant', 'muted'))]; }));
+    var staff = R.table(['Person', 'Seat', 'Face ID', 'Last sign-in'], d.staff.map(function (p) {
+      return [p.username, p.seat || html(R.pill('No seat', 'warn')), html(p.faceEnrolled ? R.pill('Enrolled', 'ok') : R.pill('Not set up', 'warn')), p.lastLogin ? ago(p.lastLogin) : 'Never'];
+    }));
+    return tiles + R.cols(2, [R.section('Org chart seats', seats, 'Vacant seats can be filled from the Admins tab'), R.section('People with accounts', staff)]);
+  }
+});
+</script>
+</body>
+</html>
