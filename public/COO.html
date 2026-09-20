@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="robots" content="noindex, nofollow" />
+<title>COO Dashboard — Razariser</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=Montserrat:wght@600;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="_shared.css" />
+</head>
+<body>
+<div id="rd-app"></div>
+<script src="_shared.js"></script>
+<script>
+// COO dashboard. Data comes from Roles-dashboard.js/COO.js via
+// /api/admin?action=role-dashboard — this file only decides how it looks.
+RD.boot({
+  role: 'COO',
+  render: function (d) {
+    var R = RD, esc = R.esc, inr = R.inr, num = R.num, pct = R.pct, ago = R.ago, html = R.html, when = R.when;
+    var store = d.maintenance ? R.pill(d.maintenance.on ? 'Maintenance mode on' : 'Store live', d.maintenance.on ? 'bad' : 'ok') : '';
+    return R.na(d.orders, function (o) {
+      var tiles = R.grid([
+        R.stat('Total orders', num(o.total)),
+        R.stat('Paid, awaiting shipment', num(o.awaitingShipment), '', o.awaitingShipment ? 'warn' : ''),
+        R.stat('Stuck over 5 days', num(o.stale.count), 'Open, no tracking number', o.stale.count ? 'bad' : 'ok'),
+        R.stat('Shipped or delivered', num(o.shippedOrDelivered)),
+        R.stat('Tracking coverage', pct(o.trackingCoverage), 'Shipped orders with a tracking number', o.trackingCoverage != null && o.trackingCoverage < 100 ? 'warn' : ''),
+      ]);
+      var stuck = R.table(['Age', 'Status', {label: 'Amount', num: true}], o.stale.oldest.map(function (x) { return [x.ageDays + ' days', R.statusPill(x.status), inr(x.amount)]; }), 'No orders are stuck.');
+      var recent = R.table(['Placed', 'Status', 'Tracking', {label: 'Amount', num: true}], o.recent.map(function (x) { return [ago(x.createdAt), R.statusPill(x.status), x.hasTracking ? 'Yes' : '—', inr(x.amount)]; }), 'No orders yet.');
+      return '<div style="margin-bottom:14px">' + store + '</div>' + tiles +
+        R.cols(2, [R.section('Fulfilment pipeline', R.statusBars(o.byStatus)), R.section('Needs attention', stuck, 'Oldest first')]) +
+        R.section('Latest orders', recent);
+    }, 'Order data');
+  }
+});
+</script>
+</body>
+</html>
