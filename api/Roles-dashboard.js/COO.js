@@ -1,4 +1,3 @@
-// Roles-dashboard.js/COO.js — Chief Operations Officer
 // Real data only: order fulfilment pipeline, stuck orders, store status.
 
 'use strict';
