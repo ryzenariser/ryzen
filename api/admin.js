@@ -11,6 +11,9 @@ const { signToken, requireAuth, TOKEN_TTL_MS } = require('./_lib/auth');
 const { supabase } = require('./_lib/supabase');
 const { verifyPassword } = require('./_lib/passwords');
 const { getJSON } = require('./_lib/github');
+// Per-role dashboards: one backend module per seat, kept outside api/ so they
+// don't count as extra Vercel functions. See Roles-dashboard.js/index.js.
+const RoleDashboards = require('../Roles-dashboard.js/index.js');
 
 const FULL_PERMISSIONS = {
   products: { view: true, edit: true, delete: true },
@@ -213,6 +216,8 @@ async function handleLogin(req, res) {
     mustChangePassword: !!admin.must_change_password,
     mustEnrollFace: !admin.face_reference_path,
     orgTitle: admin.org_title || null,
+    // Where a sub-admin with an assigned role should land after signing in.
+    dashboardPath: admin.role === 'super_admin' ? null : RoleDashboards.pathFor(admin.org_title),
     // The frontend uses this to optionally attach exact GPS coordinates
     // to this login via action=update-location, if the admin grants
     // browser location permission.
@@ -296,6 +301,7 @@ async function handleDashboard(req, res) {
     role: session.role,
     permissions: session.permissions || {},
     orgTitle: session.role === 'super_admin' ? 'Board of Directors' : (admin?.org_title || null),
+    dashboardPath: session.role === 'super_admin' ? null : RoleDashboards.pathFor(admin?.org_title),
     activeRoles,
     username: admin?.username || null,
   });
@@ -985,6 +991,10 @@ const INTEGRATION_ENV_VARS = {
   telegramMaintenance: { label: 'Telegram (Maintenance Mode bot)', vars: ['TELEGRAM_BOT_TOKEN_MAINTENANCE', 'TELEGRAM_CHAT_ID_MAINTENANCE'] },
   razorpay: { label: 'Razorpay (payments/webhook)', vars: ['RAZORPAY_WEBHOOK_SECRET'] },
   vercel: { label: 'Vercel API (System status)', vars: ['VERCEL_API_TOKEN', 'VERCEL_PROJECT_ID'] },
+  metaAds: { label: 'Meta Ads (CMO dashboard)', vars: ['META_ACCESS_TOKEN', 'META_AD_ACCOUNT_ID'] },
+  instagram: { label: 'Instagram (CMO dashboard)', vars: ['INSTAGRAM_ACCESS_TOKEN', 'INSTAGRAM_USER_ID'] },
+  searchConsole: { label: 'Google Search Console (CECO dashboard)', vars: ['GSC_SERVICE_ACCOUNT_JSON', 'GSC_SITE_URL'] },
+  uptimeRobot: { label: 'UptimeRobot (CTO dashboard)', vars: ['UPTIMEROBOT_API_KEY'] },
 };
 
 async function handleIntegrationsStatus(req, res) {
@@ -1241,6 +1251,8 @@ async function handleFaceChallengeVerify(req, res) {
     expiresInMs: TOKEN_TTL_MS,
     role: admin.role,
     mustChangePassword: !!admin.must_change_password,
+    orgTitle: admin.org_title || null,
+    dashboardPath: admin.role === 'super_admin' ? null : RoleDashboards.pathFor(admin.org_title),
     loginLogId,
   });
 }
@@ -1335,7 +1347,8 @@ async function handleFaceStatusAll(req, res) {
 // label/identity layer on top of the existing, real permissions system —
 // it does not itself grant or restrict access to anything. Kept in
 // admin.js rather than admins.js so this stays self-contained.
-const ORG_TITLES = ['COO', 'CTO', 'CFO', 'CMO', 'CLO', 'CHRO', 'CAIO', 'CDO (Design)', 'CPO', 'CECO', 'CCO', 'CDO (Data)'];
+// Single source of truth: the roles are the modules in Roles-dashboard.js/.
+const ORG_TITLES = RoleDashboards.ROLE_TITLES;
 
 // Each role has its OWN Telegram bot (its own token, its own webhook) —
 // not one shared bot with topic threads. Env var names can't contain
@@ -1360,7 +1373,7 @@ async function handleOrgTitlesAll(req, res) {
     role: a.role,
     orgTitle: a.org_title || null,
   }));
-  return res.status(200).json({ titles, availableTitles: ORG_TITLES });
+  return res.status(200).json({ titles, availableTitles: ORG_TITLES, onePersonPerRole: RoleDashboards.ONE_PERSON_PER_ROLE });
 }
 
 async function handleOrgTitleSet(req, res) {
@@ -1378,10 +1391,112 @@ async function handleOrgTitleSet(req, res) {
     return res.status(400).json({ error: 'Unrecognized org title.' });
   }
 
+  // A role is a seat: when one person per seat is enforced, a role that
+  // someone else already holds is not vacant and can't be assigned.
+  if (orgTitle && RoleDashboards.ONE_PERSON_PER_ROLE) {
+    const { data: holders } = await supabase
+      .from('admins')
+      .select('username')
+      .eq('org_title', orgTitle)
+      .neq('id', adminId)
+      .limit(1);
+    if (holders && holders.length) {
+      return res.status(409).json({ error: `${orgTitle} is already held by "${holders[0].username}". Choose a vacant role, or vacate that seat first.` });
+    }
+  }
+
   const { error } = await supabase.from('admins').update({ org_title: orgTitle || null }).eq('id', adminId);
   if (error) throw error;
 
   return res.status(200).json({ success: true });
+}
+
+/* ── Role actions: a form on a role page saves data through here. Only the
+   holder of that seat (or Super Admin) may call the actions for that role. ── */
+async function handleRoleAction(req, res) {
+  const session = requireAuth(req, res);
+  if (!session) return;
+
+  const { data: admin } = await supabase
+    .from('admins')
+    .select('id, username, role, org_title, deactivated_at')
+    .eq('id', session.sub)
+    .maybeSingle();
+  if (!admin || admin.deactivated_at) {
+    return res.status(401).json({ error: 'This account has been deactivated.' });
+  }
+
+  const role = String(req.query.role || '');
+  const name = String(req.query.name || '');
+  if (admin.role !== 'super_admin' && admin.org_title !== role) {
+    return res.status(403).json({ error: 'Only the holder of this role can do that.' });
+  }
+
+  try {
+    const result = await RoleDashboards.act(role, name, {
+      supabase, session, admin, env: process.env, getJSON, body: req.body || {},
+    });
+    return res.status(200).json({ ok: true, result });
+  } catch (err) {
+    if (!err.status) console.error('role-action failed:', err && err.message);
+    // Messages we wrote (with a status) are safe to show; anything else stays in the server log.
+    return res.status(err.status || 500).json({ error: err.status ? err.message : 'Could not save. Try again.' });
+  }
+}
+
+/* ── Role dashboards ────────────────────────────────────────────────────
+   Each seat has a page in Roles-dashboard.html/ and a backend module in
+   Roles-dashboard.js/. A sub-admin can only load the dashboard for the seat
+   they hold (looked up fresh from the DB, not from the token, so changing
+   someone's role takes effect immediately). Super Admin can load any seat.
+   The static HTML pages contain no data — everything comes through here. ── */
+async function handleRoleDashboard(req, res) {
+  const session = requireAuth(req, res);
+  if (!session) return;
+
+  const { data: admin } = await supabase
+    .from('admins')
+    .select('id, username, role, org_title, deactivated_at')
+    .eq('id', session.sub)
+    .maybeSingle();
+  if (!admin || admin.deactivated_at) {
+    return res.status(401).json({ error: 'This account has been deactivated.' });
+  }
+
+  const isSuper = admin.role === 'super_admin';
+  const seat = admin.org_title || null;
+  const requested = req.query.role ? String(req.query.role) : null;
+
+  if (!isSuper && !seat) {
+    return res.status(403).json({ error: 'You don\u2019t have a role yet. Ask the Board of Directors to assign you one.' });
+  }
+
+  const role = isSuper ? requested : seat;
+  if (!role) return res.status(400).json({ error: 'role is required.' });
+  if (!RoleDashboards.has(role)) return res.status(400).json({ error: 'Unrecognized role.' });
+
+  if (!isSuper && requested && requested !== seat) {
+    return res.status(403).json({
+      error: `That is the ${requested} dashboard. Your role is ${seat}.`,
+      dashboardPath: RoleDashboards.pathFor(seat),
+    });
+  }
+
+  const result = await RoleDashboards.run(role, {
+    supabase,
+    session,
+    admin,
+    env: process.env,
+    getJSON,
+    integrationEnvVars: INTEGRATION_ENV_VARS,
+  });
+
+  return res.status(200).json({
+    ...result,
+    viewer: { username: admin.username, isSuperAdmin: isSuper },
+    roles: isSuper ? RoleDashboards.listRoles() : undefined,
+    generatedAt: new Date().toISOString(),
+  });
 }
 
 /* ── Multi-role activation: each admin/sub-admin can have SEVERAL personas
@@ -2718,6 +2833,8 @@ module.exports = async function handler(req, res) {
     if (req.method === 'GET' && action === 'face-status-all') return await handleFaceStatusAll(req, res);
     if (req.method === 'GET' && action === 'org-titles-all') return await handleOrgTitlesAll(req, res);
     if (req.method === 'POST' && action === 'set-org-title') return await handleOrgTitleSet(req, res);
+    if (req.method === 'GET' && action === 'role-dashboard') return await handleRoleDashboard(req, res);
+    if (req.method === 'POST' && action === 'role-action') return await handleRoleAction(req, res);
     if (req.method === 'GET' && action === 'marketing-overview') return await handleMarketingOverview(req, res);
     if (req.method === 'GET' && action === 'marketing-brief') return await handleMarketingBrief(req, res);
     if (req.method === 'GET' && action === 'marketing-forecast') return await handleMarketingForecast(req, res);
