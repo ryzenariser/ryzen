@@ -1128,10 +1128,11 @@ tbody tr:hover{background:rgba(255,255,255,.02)}
       <div class="field"><label>Username</label><input id="adm-username" required /></div>
       <div class="field"><label id="adm-pass-label">Password</label><input id="adm-password" type="password" /></div>
       <div class="field">
-        <label>Org Title <span style="color:var(--gray);font-weight:400">(optional)</span></label>
+        <label>Role</label>
         <select id="adm-org-title" class="filter-select" style="width:100%">
-          <option value="">— Vacant —</option>
+          <option value="">Loading roles…</option>
         </select>
+        <div id="adm-org-title-hint" style="font-size:11px;color:var(--gray);margin-top:6px"></div>
       </div>
       <label style="margin-bottom:10px;display:block">Permissions</label>
       <div class="row-2">
@@ -1280,6 +1281,22 @@ let currentActiveRoles = [];
 let currentChatPersona = 'personal';
 const ADM_ORG_TITLES = ['COO', 'CTO', 'CFO', 'CMO', 'CLO', 'CHRO', 'CAIO', 'CDO (Design)', 'CPO', 'CECO', 'CCO', 'CDO (Data)'];
 let adminOrgTitleMap = {};
+let pendingDashboardPath = null; // role dashboard to open once face enrolment is done/skipped
+
+// Same rule as Roles-dashboard.js/index.js: 'CDO (Design)' -> 'CDO-Design'.
+function roleDashboardUrl(title) {
+  return '/Roles-dashboard.html/' + String(title).replace(/[^A-Za-z0-9]+/g, '-').replace(/^-+|-+$/g, '') + '.html';
+}
+// Leaving the page would cancel the login-photo upload, so give it a moment to finish first.
+async function goToRoleDashboard(path, photoPromise) {
+  if (photoPromise) await Promise.race([photoPromise, new Promise((r) => setTimeout(r, 8000))]);
+  location.href = path;
+}
+function goToPendingRoleDashboard() {
+  if (!pendingDashboardPath) return;
+  const p = pendingDashboardPath; pendingDashboardPath = null;
+  location.href = p;
+}
 // Convenience defaults only — picking a title pre-checks the permission
 // boxes that seat would typically need, using the SAME existing checkbox
 // system (nothing new here, just smart defaults). Still fully editable
@@ -1320,8 +1337,15 @@ document.getElementById('login-form').addEventListener('submit', async (e) => {
     }
 
     setToken(data.token);
-    if (data.loginLogId) {
-      captureLoginPhoto(data.loginLogId, data.token); // fire-and-forget, never blocks login
+    const photoDone = data.loginLogId ? captureLoginPhoto(data.loginLogId, data.token) : null; // never blocks login
+    // A sub-admin with an assigned role lands on their own role dashboard.
+    // If they still have to enrol their face, that happens here first and
+    // the redirect follows.
+    pendingDashboardPath = data.dashboardPath || null;
+    if (pendingDashboardPath && !data.mustEnrollFace) {
+      const p = pendingDashboardPath; pendingDashboardPath = null;
+      await goToRoleDashboard(p, photoDone);
+      return;
     }
     showApp();
     if (data.mustEnrollFace) {
@@ -1420,7 +1444,8 @@ document.getElementById('face-challenge-capture-btn').addEventListener('click', 
     setToken(data.token);
     stopStream(video);
     faceChallengeModal.classList.remove('open');
-    if (data.loginLogId) captureLoginPhoto(data.loginLogId, data.token);
+    const photoDone = data.loginLogId ? captureLoginPhoto(data.loginLogId, data.token) : null;
+    if (data.dashboardPath) { await goToRoleDashboard(data.dashboardPath, photoDone); return; }
     showApp();
   } catch (err) {
     status.className = 'status-msg err';
@@ -1473,6 +1498,7 @@ document.getElementById('face-enroll-skip-btn').addEventListener('click', () => 
   stopStream(document.getElementById('face-enroll-video'));
   faceEnrollModal.classList.remove('open');
   document.querySelector('#face-enroll-modal h2').textContent = 'Set Up Face Recognition';
+  goToPendingRoleDashboard();
 });
 document.getElementById('face-enroll-capture-btn').addEventListener('click', async () => {
   const video = document.getElementById('face-enroll-video');
@@ -1492,6 +1518,7 @@ document.getElementById('face-enroll-capture-btn').addEventListener('click', asy
       faceEnrollModal.classList.remove('open');
       document.querySelector('#face-enroll-modal h2').textContent = 'Set Up Face Recognition';
       if (document.getElementById('tab-admins').style.display !== 'none') loadAdmins();
+      if (!faceEnrollTargetAdminId) goToPendingRoleDashboard();
     }, 600);
   } catch (err) {
     status.className = 'status-msg err';
@@ -1521,19 +1548,24 @@ async function captureLoginPhoto(loginLogId, token) {
     canvas.getContext('2d').drawImage(video, 0, 0);
     stream.getTracks().forEach((t) => t.stop());
 
-    canvas.toBlob(async (blob) => {
-      if (!blob) return;
-      const formData = new FormData();
-      formData.append('file', blob, 'login.jpg');
-      formData.append('loginLogId', loginLogId);
-      try {
-        await fetch('/api/login-photo', {
-          method: 'POST',
-          headers: { Authorization: 'Bearer ' + token },
-          body: formData,
-        });
-      } catch (e) { /* silent — never interrupt the admin's session */ }
-    }, 'image/jpeg', 0.85);
+    // Resolves after the upload finishes, so a redirect to a role dashboard
+    // can wait for it instead of cancelling it mid-flight.
+    await new Promise((resolve) => {
+      canvas.toBlob(async (blob) => {
+        if (!blob) { resolve(); return; }
+        const formData = new FormData();
+        formData.append('file', blob, 'login.jpg');
+        formData.append('loginLogId', loginLogId);
+        try {
+          await fetch('/api/login-photo', {
+            method: 'POST',
+            headers: { Authorization: 'Bearer ' + token },
+            body: formData,
+          });
+        } catch (e) { /* silent — never interrupt the admin's session */ }
+        resolve();
+      }, 'image/jpeg', 0.85);
+    });
   } catch (e) {
     // camera denied/unavailable — silently skip, login proceeds regardless
   }
@@ -2145,6 +2177,7 @@ async function renderMyDashboardBody(title) {
       <div style="font-size:16px;font-weight:700;color:var(--gold)">${escapeHtml(title)}</div>
       <div style="font-size:11px;color:var(--gray);margin-bottom:8px">${entry ? escapeHtml(entry.name) : ''}</div>
       ${entry ? `<div style="font-size:12px;line-height:1.7">${entry.depts.map(escapeHtml).join(' · ')}</div>` : ''}
+      <a class="btn btn-gold btn-sm" style="display:inline-block;margin-top:12px;text-decoration:none" href="${escapeAttr(roleDashboardUrl(title))}">Open ${escapeHtml(title)} dashboard</a>
     </div>`;
 
   if (!modules.length) {
@@ -3595,7 +3628,7 @@ async function loadAdmins() {
         titleCell = '<span style="color:var(--gold)">Board of Directors</span>';
       } else if (currentRole === 'super_admin') {
         const current = orgTitleMap[a.id] || '';
-        const options = ['<option value="">— Vacant —</option>'].concat(
+        const options = ['<option value="">— No role —</option>'].concat(
           availableTitles.map((t) => `<option value="${escapeAttr(t)}"${t === current ? ' selected' : ''}>${escapeHtml(t)}</option>`)
         ).join('');
         titleCell = `<select class="filter-select org-title-select" data-admin-id="${a.id}" style="font-size:12px;padding:4px 8px">${options}</select>`;
@@ -3627,6 +3660,7 @@ async function loadAdmins() {
           orgChartRendered = false; // force re-render next time Org Chart tab is opened, so it reflects the new assignment
         } catch (err) {
           alert(err.message);
+          loadAdmins(); // put the dropdown back to what is really saved
         } finally {
           sel.disabled = false;
         }
@@ -3696,7 +3730,7 @@ function readPermCheckboxes() {
   };
 }
 
-function openAdminModal(admin) {
+async function openAdminModal(admin) {
   document.getElementById('admin-modal-title').textContent = admin ? 'Edit Sub-Admin' : 'Add Sub-Admin';
   document.getElementById('adm-id').value = admin ? admin.id : '';
   document.getElementById('adm-username').value = admin ? admin.username : '';
@@ -3705,9 +3739,43 @@ function openAdminModal(admin) {
   document.getElementById('adm-password').placeholder = admin ? 'Leave blank to keep current password' : '';
   document.getElementById('adm-password').required = !admin;
   setPermCheckboxes(admin ? admin.permissions : {});
+  document.getElementById('admin-error').textContent = '';
+
   const orgTitleSelect = document.getElementById('adm-org-title');
-  orgTitleSelect.innerHTML = '<option value="">— Vacant —</option>' + ADM_ORG_TITLES.map((t) => `<option value="${escapeAttr(t)}">${escapeHtml(t)}</option>`).join('');
+  const hint = document.getElementById('adm-org-title-hint');
+  // A new sub-admin must be given a role. (Editing someone who has none yet
+  // is still allowed to leave it empty.)
+  orgTitleSelect.required = !admin;
+  orgTitleSelect.innerHTML = '<option value="">Loading roles…</option>';
+  hint.textContent = '';
+  adminModal.classList.add('open');
+
+  // Which roles are vacant right now — read fresh, not from a cache.
+  const heldBy = {};
+  let onePerRole = true;
+  try {
+    const orgData = await api('/api/admin?action=org-titles-all');
+    onePerRole = orgData.onePersonPerRole !== false;
+    (orgData.titles || []).forEach((t) => {
+      if (t.orgTitle && (!admin || t.adminId !== admin.id)) heldBy[t.orgTitle] = t.username;
+    });
+  } catch (e) { /* the server re-checks on save, so carry on with everything selectable */ }
+
+  const placeholder = admin ? '<option value="">No role (vacant)</option>' : '<option value="">Select a vacant role…</option>';
+  const options = ADM_ORG_TITLES.map((t) => {
+    const entry = findOrgEntry(t);
+    const label = t + (entry ? ' — ' + entry.name : '');
+    if (onePerRole && heldBy[t]) return `<option value="${escapeAttr(t)}" disabled>${escapeHtml(label)} (held by ${escapeHtml(heldBy[t])})</option>`;
+    return `<option value="${escapeAttr(t)}">${escapeHtml(label)}</option>`;
+  });
+  orgTitleSelect.innerHTML = placeholder + options.join('');
   orgTitleSelect.value = admin ? (adminOrgTitleMap[admin.id] || '') : '';
+
+  const vacant = ADM_ORG_TITLES.filter((t) => !(onePerRole && heldBy[t])).length;
+  hint.textContent = !admin && vacant === 0
+    ? 'Every role is filled. Vacate a seat in the Admins table before adding someone new.'
+    : 'They will open their own dashboard for this role when they sign in.';
+
   if (!orgTitleSelect.dataset.wired) {
     orgTitleSelect.dataset.wired = '1';
     orgTitleSelect.addEventListener('change', () => {
@@ -3718,8 +3786,6 @@ function openAdminModal(admin) {
       }
     });
   }
-  document.getElementById('admin-error').textContent = '';
-  adminModal.classList.add('open');
 }
 
 window.editAdmin = function(id) {
@@ -3745,6 +3811,11 @@ document.getElementById('admin-form').addEventListener('submit', async (e) => {
   const permissions = readPermCheckboxes();
   const orgTitle = document.getElementById('adm-org-title').value;
 
+  if (!id && !orgTitle) {
+    errEl.textContent = 'Choose a role for this sub-admin.';
+    return;
+  }
+
   try {
     if (id) {
       const body = { id, permissions };
@@ -3761,8 +3832,15 @@ document.getElementById('admin-form').addEventListener('submit', async (e) => {
         // username instead of trusting an assumed response shape.
         const listData = await api('/api/admins?action=list');
         const created = (listData.admins || []).find((a) => a.username === username);
-        if (created) {
+        try {
+          if (!created) throw new Error('the new account could not be found');
           await api('/api/admin?action=set-org-title', { method: 'POST', body: JSON.stringify({ adminId: created.id, orgTitle }) });
+        } catch (roleErr) {
+          // The account exists but has no role yet — say so, keep the modal
+          // open, and refresh the table so it can be fixed from there.
+          errEl.textContent = `Account "${username}" was created, but the role was not assigned: ${roleErr.message}. Set it from the Role column in the table.`;
+          loadAdmins();
+          return;
         }
       }
     }
