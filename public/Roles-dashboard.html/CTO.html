@@ -1,0 +1,697 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="robots" content="noindex, nofollow" />
+<meta name="theme-color" content="#011207" />
+<title>CTO Operations Center — Razariser</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=Montserrat:wght@600;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="_shared.css" />
+<style>
+/* Near-Black Green page, Dark Forest Green surfaces, Soft Sage Mint text and chart panels, Apple Green accent.
+   Amber and coral appear only for warnings and failures. */
+:root{--cto-bg:#011207;--cto-card:#012F13;--cto-mint:#E2F0CC;--cto-apple:#8BC53D;--cto-warn:#F0C24B;--cto-bad:#FF7A6B;--cto-line:rgba(226,240,204,.14);--cto-dim:rgba(226,240,204,.68)}
+html{color-scheme:dark}
+html,body,#rd-app{background:var(--cto-bg)!important;color:var(--cto-mint)}
+::selection{background:var(--cto-apple);color:var(--cto-bg)}
+#cto-root{max-width:1200px;margin:0 auto;padding:0 0 40px;font-family:Inter,system-ui,sans-serif;font-size:14px;line-height:1.5;font-variant-numeric:tabular-nums}
+#cto-root h2,#cto-root p,#cto-root dl,#cto-root dd{margin:0}
+.t-ok{--tone:var(--cto-apple)}
+.t-warn{--tone:var(--cto-warn)}
+.t-bad{--tone:var(--cto-bad)}
+.cto-bar{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;margin:0 0 12px;font-size:13px;color:var(--cto-dim)}
+.cto-sp{flex:1}
+.cto-live{display:inline-flex;align-items:center;gap:8px;color:var(--cto-mint)}
+.cto-dot{display:inline-block;flex:none;width:9px;height:9px;border-radius:50%;background:var(--cto-apple)}
+.cto-dot.on{animation:cto-pulse 2s infinite}
+.cto-dot.err{background:var(--cto-bad)}
+.cto-dot.off{background:var(--cto-dim)}
+@keyframes cto-pulse{0%{box-shadow:0 0 0 0 rgba(139,197,61,.55)}100%{box-shadow:0 0 0 8px rgba(139,197,61,0)}}
+.cto-btn,.cto-tab{font:inherit;font-size:13px;font-weight:500;color:var(--cto-mint);background:transparent;border:1px solid rgba(226,240,204,.3);border-radius:8px;padding:6px 14px;min-height:36px;cursor:pointer}
+.cto-btn:hover,.cto-tab:hover{background:rgba(226,240,204,.08)}
+.cto-btn:focus-visible,.cto-tab:focus-visible,.cto-find input:focus-visible,a:focus-visible{outline:2px solid var(--cto-apple);outline-offset:2px}
+.cto-btn.go{background:var(--cto-apple);border-color:var(--cto-apple);color:var(--cto-bg);font-weight:600}
+.cto-btn.go:hover{background:#9bd14c}
+.cto-find{display:flex;gap:8px;margin:0 0 16px}
+.cto-find input{flex:1;min-width:0;font:inherit;color:var(--cto-mint);background:var(--cto-card);border:1px solid rgba(226,240,204,.3);border-radius:8px;padding:8px 12px;min-height:36px}
+.cto-crumb{margin:0 0 14px;font-size:13px;color:var(--cto-dim)}
+.cto-crumb a,.cto-link{color:var(--cto-apple);text-decoration:underline;text-underline-offset:3px}
+.cto-hero{background:var(--cto-card);border:1px solid var(--cto-line);border-left:4px solid var(--tone);border-radius:14px;padding:16px 20px;margin:0 0 16px}
+.cto-hero h2{font:700 22px/1.25 'Playfair Display',Georgia,serif}
+.cto-hero p{margin-top:4px;color:var(--cto-dim)}
+.cto-issues{list-style:none;margin:10px 0 0;padding:0;display:grid;gap:6px}
+.cto-issues li{position:relative;padding-left:18px}
+.cto-issues li:before{content:"";position:absolute;left:0;top:.55em;width:8px;height:8px;border-radius:50%;background:var(--tone)}
+.cto-issues .cto-link{color:inherit}
+.cto-tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin:0 0 16px}
+.cto-tile{display:flex;flex-direction:column;gap:2px;background:var(--cto-card);border:1px solid var(--cto-line);border-radius:14px;padding:14px 16px;box-shadow:inset 3px 0 0 var(--tone,transparent);color:inherit;text-decoration:none}
+a.cto-tile:hover{border-color:var(--cto-apple)}
+.cto-tl,.cto-ts{font-size:12px;color:var(--cto-dim)}
+.cto-tv{font-size:22px;font-weight:600;line-height:1.25;color:var(--tone,var(--cto-mint))}
+.cto-sec{background:var(--cto-card);border:1px solid var(--cto-line);border-radius:16px;padding:18px 20px;margin:0 0 16px;min-width:0}
+.cto-sec .cto-tile{background:rgba(1,18,7,.55)}
+.cto-sec .cto-tiles{grid-template-columns:repeat(auto-fit,minmax(110px,1fr))}
+.cto-sec>header{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:2px 12px;margin:0 0 14px}
+.cto-sec h2{font:700 18px/1.3 'Playfair Display',Georgia,serif}
+.cto-sec>header p{font-size:12px;color:var(--cto-dim)}
+.cto-cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,420px),1fr));gap:16px;margin:0 0 16px}
+.cto-cols>.cto-sec{margin:0}
+.cto-more{margin:-4px 0 16px}
+.cto-sec.light{background:var(--cto-mint);color:var(--cto-card);border-color:transparent}
+.light>header p{color:rgba(1,47,19,.7)}
+.light .cto-link,.light .cto-crumb a{color:var(--cto-card)}
+.cto-tabs,.cto-chips{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 14px}
+.cto-tab{border-radius:999px}
+.cto-tab[aria-pressed="true"]{background:var(--cto-apple);border-color:var(--cto-apple);color:var(--cto-bg)}
+.light .cto-tab{color:var(--cto-card);border-color:rgba(1,47,19,.35)}
+.light .cto-tab:hover{background:rgba(1,47,19,.08)}
+.light .cto-tab[aria-pressed="true"]{background:var(--cto-card);border-color:var(--cto-card);color:var(--cto-mint)}
+.light .cto-tab:focus-visible{outline-color:var(--cto-card)}
+.cto-plot{position:relative;height:200px;cursor:pointer;touch-action:pan-y;border-bottom:1px solid rgba(1,47,19,.35);background:linear-gradient(rgba(1,47,19,.12) 1px,transparent 1px) 0 0/100% 25%}
+.cto-plot svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
+.cto-plot path{vector-effect:non-scaling-stroke}
+.cto-ln{fill:none;stroke:var(--cto-card);stroke-width:2.5;stroke-linejoin:round;stroke-linecap:round}
+.cto-ar{fill:var(--cto-apple);opacity:.5;stroke:none}
+.cto-pt{position:absolute;width:10px;height:10px;margin:-5px 0 0 -5px;border-radius:50%;background:var(--cto-card);box-shadow:0 0 0 4px rgba(139,197,61,.7)}
+.cto-x{position:absolute;bottom:0;width:3px;height:16px;margin-left:-1px;background:#C8372D}
+.cto-cur{position:absolute;top:0;bottom:0;width:1px;background:var(--cto-card);opacity:.45;pointer-events:none}
+.cto-tip{position:absolute;top:6px;z-index:2;padding:5px 9px;border-radius:6px;background:var(--cto-bg);color:var(--cto-mint);font-size:12px;white-space:nowrap;pointer-events:none}
+.cto-tip[hidden],.cto-cur[hidden]{display:none}
+.cto-yl{position:absolute;left:4px;font-size:11px;opacity:.7}
+.cto-xl{display:flex;justify-content:space-between;margin-top:6px;font-size:11px;opacity:.7}
+.cto-bars{display:flex;align-items:flex-end;gap:3px;height:200px;border-bottom:1px solid rgba(1,47,19,.35)}
+.cto-col{flex:1;min-width:0;height:100%;display:flex;flex-direction:column;justify-content:flex-end}
+.cto-seg{display:block;background:var(--cto-card);border-radius:2px 2px 0 0}
+.cto-seg.f{background:#C8372D}
+.cto-kpis{display:flex;flex-wrap:wrap;gap:10px 28px;margin:14px 0 0}
+.cto-kpis dt,.cto-kv dt{font-size:12px;opacity:.7}
+.cto-kpis dd{margin:2px 0 0;font-size:20px;font-weight:600}
+.cto-kv{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px 20px}
+.cto-kv dd{margin:2px 0 0;overflow-wrap:anywhere}
+.cto-gap{height:14px}
+.cto-wrap{overflow-x:auto}
+.cto-tbl{width:100%;border-collapse:collapse;font-size:13px}
+.cto-tbl th{padding:0 10px 8px 0;text-align:left;font-size:12px;font-weight:500;color:var(--cto-dim);white-space:nowrap}
+.cto-tbl td{padding:10px 10px 10px 0;border-top:1px solid var(--cto-line);vertical-align:top;overflow-wrap:anywhere}
+.cto-go{cursor:pointer}
+.cto-go:hover td{background:rgba(226,240,204,.06)}
+.cto-pill{display:inline-block;padding:2px 10px;border-radius:999px;font-size:12px;font-weight:600;white-space:nowrap;color:var(--tone);background:color-mix(in srgb,var(--tone) 16%,transparent);border:1px solid color-mix(in srgb,var(--tone) 40%,transparent)}
+.cto-note,.cto-empty{color:var(--cto-dim)}
+.cto-empty{padding:20px 0;text-align:center}
+.light .cto-empty{color:rgba(1,47,19,.7)}
+.cto-un{padding:12px 14px;margin:0 0 10px;border:1px dashed rgba(226,240,204,.3);border-radius:10px;color:var(--cto-dim)}
+.cto-un b{margin-right:6px;color:var(--cto-warn)}
+.light .cto-un{border-color:rgba(1,47,19,.35);color:rgba(1,47,19,.85)}
+.light .cto-un b{color:#8a5a00}
+.cto-br{display:grid;grid-template-columns:1fr auto;gap:4px 12px;align-items:center;margin:0 0 12px}
+.cto-br>span{grid-column:1/-1;font-size:13px;overflow-wrap:anywhere}
+.cto-bt{height:8px;border-radius:99px;background:rgba(226,240,204,.1);overflow:hidden}
+.cto-bt i{display:block;height:100%;border-radius:99px;background:var(--tone,var(--cto-apple))}
+.cto-br b{font-weight:600}
+.cto-nav{display:flex;gap:4px;overflow-x:auto;margin:0 0 12px;padding:0 0 4px;border-bottom:1px solid var(--cto-line);scrollbar-width:thin}
+.cto-nav a{flex:none;padding:8px 12px;border-radius:8px;color:var(--cto-dim);text-decoration:none;font-size:13px;font-weight:500}
+.cto-nav a:hover{color:var(--cto-mint);background:rgba(226,240,204,.06)}
+.cto-nav a[aria-current="page"]{color:var(--cto-bg);background:var(--cto-apple);font-weight:600}
+.cto-tools{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:-6px 0 16px}
+.cto-toast{padding:4px 10px;border-radius:6px;background:var(--cto-apple);color:var(--cto-bg);font-size:12px;font-weight:600}
+.cto-toast[hidden]{display:none}
+.cto-setgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px;margin:0 0 10px}
+.cto-set{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.cto-set input[type=number]{width:90px;font:inherit;color:var(--cto-mint);background:var(--cto-bg);border:1px solid rgba(226,240,204,.3);border-radius:8px;padding:6px 8px;min-height:36px}
+.cto-set input[type=checkbox]{width:18px;height:18px;accent-color:var(--cto-apple)}
+.cto-tbl th{cursor:pointer}
+.cto-tbl th.ns{cursor:default}
+.cto-tbl th[aria-sort="ascending"]:after{content:" \2191"}
+.cto-tbl th[aria-sort="descending"]:after{content:" \2193"}
+#cto-root.wall{font-size:16px}
+#cto-root.wall .cto-nav,#cto-root.wall .cto-find{display:none}
+#cto-root.wall .cto-tiles{grid-template-columns:repeat(auto-fit,minmax(220px,1fr))}
+#cto-root.wall .cto-tv{font-size:34px}
+@media print{html,body,#rd-app{background:#fff!important;color:#000!important}.cto-nav,.cto-find,.cto-tools,.cto-bar select,.cto-bar button,.cto-tabs,.cto-chips{display:none!important}.cto-sec,.cto-sec.light,.cto-tile,.cto-hero{background:#fff!important;color:#000!important;border:1px solid #999!important;break-inside:avoid}.cto-tv,.cto-tl,.cto-ts,.cto-note,.cto-empty,.cto-un,.cto-sec>header p,.cto-link,.cto-tbl th,.cto-crumb,.cto-crumb a{color:#000!important}}
+@media (max-width:640px){.cto-plot,.cto-bars{height:160px}.cto-sec{padding:16px}.cto-hero{padding:14px 16px}.cto-sp{display:none}}
+@media (prefers-reduced-motion:reduce){.cto-dot.on{animation:none}}
+</style>
+</head>
+<body>
+<div id="rd-app"></div>
+<script src="_shared.js"></script>
+<script>
+// CTO operations center. Every value comes from Roles-dashboard.js/CTO.js via
+// /api/admin?action=role-dashboard (authorised server-side). Nothing here is simulated:
+// a source that is not connected shows DATA UNAVAILABLE and names what it needs.
+// Live mode re-runs the dashboard request RD.boot already makes (same URL, same auth) on an interval.
+(function () {
+  'use strict';
+  var R = RD, num = R.num, ago = R.ago;
+  var esc = function (s) { return R.esc(s == null ? '' : String(s)); };
+  var HOUR = 3600000, MAX = 400;
+  var RANGES = { '1m': 6e4, '5m': 3e5, '15m': 9e5, '1h': 36e5, '6h': 216e5, '24h': 864e5, '7d': 6048e5, '30d': 2592e6 };
+  var SVC = { deploy: 'Deployment', security: 'Security', ai: 'AI', build: 'App build' };
+  var st = { buf: [], win: [], range: '5m', sel: null, every: 30, paused: false, fails: 0, at: 0, d: null, busy: false, timer: 0, wired: false, noLive: false, sf: 'all', msg: '', f: { svc: '', prob: false, q: '', since: 0 } };
+  var S = '';
+  var $ = function (id) { return document.getElementById(id); };
+  // Validation: nothing user-facing is ever undefined, null, NaN or Infinity.
+  var ok = function (x) { return x != null && x !== '' && !(typeof x === 'number' && !isFinite(x)); };
+  var show = function (x, none) { return ok(x) ? String(x) : none || 'Not recorded'; };
+  var ms = function (x) { var t = ok(x) ? +new Date(x) : NaN; return isNaN(t) ? 0 : t; };
+  var when = function (x) { return ms(x) ? new Date(ms(x)).toLocaleString() : 'Not recorded'; };
+  var clock = function (x) { return ms(x) ? new Date(ms(x)).toLocaleTimeString() : '—'; };
+  var cap = function (s) { s = String(s || ''); return s.charAt(0).toUpperCase() + s.slice(1); };
+  var hm = function (t) { return new Date(t).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }); };
+  var dtone = function (s) { return s === 'READY' ? 'ok' : s === 'ERROR' ? 'bad' : 'warn'; };
+  var H = function (v, id) { return '#/' + v + (ok(id) ? '/' + encodeURIComponent(id) : ''); };
+  function route() {
+    var p = (location.hash || '#/').replace(/^#\/?/, '').split('/'), id = p[1] || '';
+    try { id = decodeURIComponent(id); } catch (e) {}
+    return { v: p[0] || 'home', id: id };
+  }
+
+  // ---- view helpers -------------------------------------------------------------------
+  var raw = function (s) { return { h: s }; };
+  var lnk = function (href, t) { return '<a class="cto-link" href="' + href + '">' + esc(t) + '</a>'; };
+  var pill = function (t, tone) { return '<span class="cto-pill t-' + tone + '">' + esc(t) + '</span>'; };
+  var tile = function (l, v, s, tone, href) {
+    var c = 'cto-tile' + (tone ? ' t-' + tone : ''), b = '<span class="cto-tl">' + esc(l) + '</span><b class="cto-tv">' + esc(show(v, 'Unavailable')) + '</b>' + (s ? '<span class="cto-ts">' + esc(s) + '</span>' : '');
+    return href ? '<a class="' + c + '" href="' + href + '">' + b + '</a>' : '<div class="' + c + '">' + b + '</div>';
+  };
+  var tiles = function (a) { return '<div class="cto-tiles">' + a.join('') + '</div>'; };
+  var stale = function () { return st.at && Date.now() - st.at > st.every * 3000 + 5000; };
+  var sec = function (title, body, hint, cls) {
+    return '<section class="cto-sec' + (cls ? ' ' + cls : '') + '"><header><h2>' + esc(title) + '</h2><p>' + esc((stale() ? 'STALE DATA. ' : '') + (hint ? hint + '. ' : '') + 'Updated ' + clock(st.at)) + '</p></header>' + body + '</section>';
+  };
+  var cols = function (a) { return '<div class="cto-cols">' + a.join('') + '</div>'; };
+  var note = function (t) { return '<p class="cto-note">' + esc(t) + '</p>'; };
+  var empty = function (t) { return '<p class="cto-empty">' + esc(t) + '</p>'; };
+  var unavail = function (what, needs) { return '<p class="cto-un"><b>DATA UNAVAILABLE</b>' + esc(what) + ' needs ' + esc(needs) + '. ' + lnk(H('cov'), 'Data sources') + '</p>'; };
+  var na = function (x, fn, label) { return x == null ? '<p class="cto-un"><b>MONITORING ERROR</b>' + esc(label) + ' could not be read from the backend.</p>' : fn(x); };
+  var crumb = function (a) { return '<nav class="cto-crumb" aria-label="Breadcrumb"><a href="#/">Overview</a>' + a.map(function (x) { return ' / ' + (x[1] ? '<a href="' + x[1] + '">' + esc(x[0]) + '</a>' : '<span>' + esc(x[0]) + '</span>'); }).join('') + '</nav>'; };
+  var gone = function (what, back) { return crumb([[what]]) + sec(what, empty('This record is not in the latest data. The dashboard loads the most recent records only.') + '<p class="cto-empty">' + lnk(back, 'Back to the list') + '</p>'); };
+  var kv = function (rows) { return '<dl class="cto-kv">' + rows.map(function (r) { return '<div><dt>' + esc(r[0]) + '</dt><dd>' + (r[1] && r[1].h != null ? r[1].h : esc(show(r[1]))) + '</dd></div>'; }).join('') + '</dl>'; };
+  function tbl(head, rows, none, tos) {
+    if (!rows.length) return empty(none || 'Nothing to show.');
+    var cell = function (c) { return c && c.h != null ? c.h : esc(show(c, '—')); };
+    return '<div class="cto-wrap"><table class="cto-tbl"><thead><tr>' + head.map(function (h) { return '<th scope="col">' + esc(h) + '</th>'; }).join('') + '</tr></thead><tbody>' +
+      rows.map(function (r, i) { return '<tr' + (tos && tos[i] ? ' class="cto-go" data-to="' + tos[i] + '"' : '') + '>' + r.map(function (c) { return '<td>' + cell(c) + '</td>'; }).join('') + '</tr>'; }).join('') + '</tbody></table></div>';
+  }
+  function bars(items) {
+    var mx = Math.max.apply(null, items.map(function (i) { return i.value; }).concat(1));
+    return items.map(function (i) { return '<div class="cto-br"><span>' + esc(i.label) + '</span><div class="cto-bt"><i class="t-' + (i.tone || 'ok') + '" style="width:' + i.value / mx * 100 + '%"></i></div><b>' + num(i.value) + '</b></div>'; }).join('');
+  }
+  var btn = function (act, v, label, on) { return '<button type="button" class="cto-tab" data-act="' + act + '" data-v="' + v + '" aria-pressed="' + on + '">' + esc(label) + '</button>'; };
+
+  // ---- live refresh: capture and replay RD's own request ---------------------------------
+  var rawFetch = window.fetch.bind(window), last = null;
+  window.fetch = function (input, init) {
+    try {
+      var u = typeof input === 'string' ? input : (input && input.url) || '';
+      if (u.indexOf('action=role-dashboard') > -1) last = { input: typeof input === 'string' ? input : input.clone(), init: init };
+    } catch (e) {}
+    return rawFetch(input, init);
+  };
+  function unwrap(j) {
+    if (!j || typeof j !== 'object') return null;
+    if (j.integrations) return j;
+    for (var k in j) if (j[k] && typeof j[k] === 'object' && j[k].integrations) return j[k];
+    return null;
+  }
+  function pull() {
+    var inp = typeof last.input === 'string' ? last.input : last.input.clone();
+    return rawFetch(inp, Object.assign({}, last.init, { cache: 'no-store' }))
+      .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+      .then(function (j) { var d = unwrap(j); if (!d) throw new Error('Unexpected response'); return d; });
+  }
+  function sample(d, net) {
+    var db = d && d.database;
+    st.buf.push({ t: Date.now(), ms: db && db.ok && ok(db.latencyMs) ? db.latencyMs : null, net: !!net, err: net ? 'The dashboard could not reach the API' : db && !db.ok ? show(db.error, 'Database check failed') : null });
+    if (st.buf.length > MAX) st.buf.shift();
+  }
+  function tick() {
+    clearTimeout(st.timer);
+    if (st.noLive || st.paused || document.hidden) return;
+    st.timer = setTimeout(refresh, st.every * 1000 * Math.min(4, 1 + st.fails));
+  }
+  function refresh() {
+    if (st.busy || st.noLive) return;
+    st.busy = true; status();
+    return pull()
+      .then(function (d) { st.fails = 0; st.d = d; st.at = Date.now(); sample(d); track(d); })
+      .catch(function () { st.fails++; sample(null, true); })
+      .then(function () { st.busy = false; paint(); tick(); });
+  }
+  function paint() {
+    var r = $('cto-main'); if (!r || !st.d) return;
+    var ae = document.activeElement, key = ae && ae.dataset && ae.dataset.act ? '[data-act="' + ae.dataset.act + '"]' + (ae.dataset.v ? '[data-v="' + ae.dataset.v + '"]' : '') : '';
+    r.innerHTML = page(st.d); afterPaint();
+    if (key) { var n = r.querySelector(key); if (n) n.focus(); }
+    status();
+  }
+  function status() {
+    var el = $('cto-state'), dot = document.querySelector('.cto-dot'); if (!el || !dot) return;
+    var t = st.at ? new Date(st.at).toLocaleTimeString() : 'never';
+    var m = st.noLive ? ['off', 'NOT LIVE (page-load snapshot). Last updated ' + t] : st.paused ? ['off', 'PAUSED. Last updated ' + t] : st.fails ? ['err', 'REAL-TIME CONNECTION LOST. Last successful update ' + t] : stale() ? ['err', 'STALE DATA. Last updated ' + t] : ['on', 'LIVE, polling every ' + st.every + 's. Last updated ' + t];
+    dot.className = 'cto-dot ' + m[0]; el.textContent = m[1];
+  }
+  function top() {
+    return navHtml() + '<div class="cto-bar"><span class="cto-live"><i class="cto-dot on"></i><span id="cto-state">Connecting</span></span><span class="cto-sp"></span>' +
+      (st.noLive ? '' : '<label>Refresh every <select id="cto-int" class="cto-btn">' + [10, 30, 60].map(function (s) { return '<option value="' + s + '"' + (s === st.every ? ' selected' : '') + '>' + s + ' seconds</option>'; }).join('') + '</select></label>' +
+        '<button type="button" class="cto-btn" data-act="pause">' + (st.paused ? 'Resume' : 'Pause') + '</button><button type="button" class="cto-btn go" data-act="now">Run health check</button>') + '</div>' +
+      '<form class="cto-find" data-find><input id="cto-q" type="search" autocomplete="off" placeholder="Search records or type a command, e.g. show failed deployments" aria-label="Search records or run a command"><button type="submit" class="cto-btn go">Search</button></form>' + toolsHtml();
+  }
+  function tip(e) {
+    var tp = $('cto-tip'), cu = $('cto-cur'); if (!tp || !cu) return;
+    var p = e.target.closest ? e.target.closest('.cto-plot') : null;
+    if (!p || !st.win.length) { tp.hidden = cu.hidden = true; return; }
+    var rc = p.getBoundingClientRect(), f = Math.min(1, Math.max(0, (e.clientX - rc.left) / rc.width)), n = st.win.length;
+    var i = n < 2 ? 0 : Math.round(f * (n - 1)), s = st.win[i], x = n < 2 ? 50 : i / (n - 1) * 100;
+    tp.hidden = cu.hidden = false;
+    cu.style.left = tp.style.left = x + '%';
+    tp.style.transform = f > 0.65 ? 'translateX(calc(-100% - 8px))' : 'translateX(8px)';
+    tp.textContent = new Date(s.t).toLocaleTimeString() + ': ' + (s.ms != null ? s.ms + ' ms' : 'failed, ' + s.err);
+  }
+  function choose(e, pl) {
+    var w = st.win, n = w.length; if (!n) return;
+    var rc = pl.getBoundingClientRect(), f = Math.min(1, Math.max(0, (e.clientX - rc.left) / rc.width));
+    st.sel = w[n < 2 ? 0 : Math.round(f * (n - 1))].t;
+    if (route().v === 'db') paint(); else location.hash = H('db');
+  }
+  function act(b) {
+    var a = b.dataset.act, v = b.dataset.v;
+    if (a === 'range') { st.range = v; st.sel = null; }
+    else if (a === 'svc') st.f.svc = v;
+    else if (a === 'prob') st.f.prob = !st.f.prob;
+    else if (a === 'clear') { st.f = { svc: '', prob: false, q: '', since: 0 }; st.msg = ''; if (route().v === 'find') { location.hash = H('events'); return; } }
+    else if (a === 'sf') st.sf = v;
+    else if (X[a]) { X[a](b); return; }
+    else if (a === 'now') return refresh();
+    else if (a === 'pause') { st.paused = !st.paused; b.textContent = st.paused ? 'Resume' : 'Pause'; if (st.paused) clearTimeout(st.timer); else refresh(); status(); return; }
+    paint();
+  }
+  // Commands become filters over already-authorised data. Anything that would change state is refused.
+  function run(q) {
+    var s = q.trim().toLowerCase(), f = { svc: '', prob: false, q: '', since: 0 };
+    if (!s) return;
+    st.msg = '';
+    if (/^(roll ?back|redeploy|delete|disable|enable|resolve|acknowledge|assign|restart|retry)\b/.test(s)) st.msg = 'Not executed: "' + q.trim() + '". Actions need a server-side handler with authorization, a reason and an audit-log entry, and none is connected yet.';
+    else {
+      if (/^show\b/.test(s)) {
+        if (/deploy/.test(s)) f.svc = 'deploy'; else if (/security|sign-?in|login/.test(s)) f.svc = 'security'; else if (/\bai\b/.test(s)) f.svc = 'ai'; else if (/build|release/.test(s)) f.svc = 'build';
+        if (/fail|error|critical|problem/.test(s)) f.prob = true;
+        if (/today/.test(s)) f.since = new Date().setHours(0, 0, 0, 0);
+        if (/database|\bdb\b/.test(s)) { location.hash = H('db'); return; }
+        if (!f.svc && /payment|incident|alert|backup|logs?\b|audit/.test(s)) { location.hash = H('cov'); return; }
+        if (!f.svc) f.q = s.replace(/^show\s+/, '');
+      } else f.q = s;
+      st.f = f;
+    }
+    if (location.hash === H('events')) paint(); else location.hash = H('events');
+  }
+  function wire() {
+    if (!last) { st.noLive = true; var t = $('cto-top'); if (t) t.innerHTML = top(); }
+    document.addEventListener('click', function (e) {
+      var el = e.target; if (!el || !el.closest) return;
+      var b = el.closest('[data-act]');
+      if (b) { act(b); return; }
+      var th = el.closest('th'); if (th && th.closest('.cto-tbl')) { sortBy(th); return; }
+      var cp = el.closest('[data-copy]'); if (cp) { copyText(cp.getAttribute('data-copy')); return; }
+      var pl = el.closest('.cto-plot'); if (pl) { choose(e, pl); return; }
+      var tr = el.closest('tr[data-to]'); if (tr && !el.closest('a')) location.hash = tr.getAttribute('data-to');
+    });
+    document.addEventListener('submit', function (e) { if (e.target.hasAttribute && e.target.hasAttribute('data-find')) { e.preventDefault(); run($('cto-q').value); } });
+    document.addEventListener('change', function (e) { if (e.target.id === 'cto-int') { st.every = +e.target.value; tick(); status(); } });
+    document.addEventListener('visibilitychange', function () { if (document.hidden) clearTimeout(st.timer); else if (!st.noLive && !st.paused) refresh(); });
+    document.addEventListener('pointermove', tip);
+    wireExtras();
+    window.addEventListener('hashchange', function () { window.scrollTo(0, 0); paint(); });
+    setInterval(status, 1000);
+    paint(); tick();
+  }
+
+  // ---- derived data (all from real records) ---------------------------------------------
+  function deps(d) { return d.deployments && d.deployments.configured ? d.deployments.deployments || [] : []; }
+  function mons(u) {
+    var arr = !u ? [] : Array.isArray(u) ? u : u.monitors || u.list || [];
+    return arr.map(function (m) {
+      var s = m.status, t = String(s == null ? '' : s);
+      var state = typeof s === 'number' ? (s === 2 ? 'up' : s === 8 || s === 9 ? 'down' : s === 0 ? 'paused' : 'unknown') : /down/i.test(t) ? 'down' : /pause/i.test(t) ? 'paused' : /up|ok|operational/i.test(t) ? 'up' : 'unknown';
+      var r = parseFloat(m.uptime != null ? m.uptime : m.uptimeRatio != null ? m.uptimeRatio : m.ratio != null ? m.ratio : m.custom_uptime_ratio);
+      return { name: m.name || m.friendlyName || m.friendly_name || m.label || 'Monitor', state: state, ratio: isFinite(r) ? r : null };
+    });
+  }
+  function evs(d) {
+    var o = [];
+    deps(d).forEach(function (x) { o.push({ svc: 'deploy', sev: dtone(x.state), at: x.createdAt, title: x.commitMessage || 'Deployment ' + show(x.state), sub: [x.state, x.target, x.branch].filter(ok).join(', '), to: H('dep', x.id), txt: [x.id, x.sha, x.branch, x.author, x.state, x.target].join(' ') }); });
+    ((d.logins && d.logins.events) || []).forEach(function (x) { o.push({ svc: 'security', sev: x.success ? 'ok' : 'warn', at: x.at, title: x.success ? 'Sign-in succeeded' : 'Failed sign-in', sub: [x.ip, x.username].filter(ok).join(', '), to: H('sec', x.key), txt: [x.id, x.ip, x.username, x.reason, x.method, 'sign-in login'].join(' ') }); });
+    ((d.aiHealth && d.aiHealth.events) || []).forEach(function (x) { o.push({ svc: 'ai', sev: 'bad', at: x.at, title: 'AI request failed', sub: [x.provider, x.model].filter(ok).join(' / ') || x.error.slice(0, 60), to: H('aiev', x.key), txt: [x.provider, x.model, x.error, x.type].join(' ') }); });
+    ((d.appBuilds && d.appBuilds.list) || []).forEach(function (x) { o.push({ svc: 'build', sev: x.status === 'live' ? 'ok' : x.status === 'rejected' ? 'bad' : 'warn', at: x.releasedOn, title: (x.platform === 'ios' ? 'iOS ' : 'Android ') + show(x.version), sub: x.status, to: H('build', x.id), txt: [x.platform, x.version, x.status, x.notes, 'release'].join(' ') }); });
+    o.forEach(function (e) { e.ms = ms(e.at); e.hay = (SVC[e.svc] + ' ' + e.sev + ' ' + e.title + ' ' + e.sub + ' ' + e.txt).toLowerCase(); });
+    return o.sort(function (a, b) { return b.ms - a.ms; });
+  }
+  var evTbl = function (list, none) {
+    return tbl(['When', 'Service', 'Event', 'Detail'], list.map(function (e) { return [e.ms ? ago(e.at) : '—', raw(pill(SVC[e.svc], e.sev === 'ok' ? 'ok' : e.sev === 'bad' ? 'bad' : 'warn')), raw(lnk(e.to, e.title)), e.sub]; }), none, list.map(function (e) { return e.to; }));
+  };
+  var lastDeploy = function (d, t) { var m = ms(t), best = null; deps(d).forEach(function (x) { var s = ms(x.createdAt); if (s && s <= m && (!best || s > ms(best.createdAt))) best = x; }); return best; };
+  var depLink = function (x) { return raw(lnk(H('dep', x.id), (x.commitMessage || x.id || 'Deployment').slice(0, 70))); };
+  var around = function (d, t0) { var a = ms(t0), b = a + HOUR; return evs(d).filter(function (e) { return ((e.svc === 'security' && e.sev !== 'ok') || e.svc === 'ai') && e.ms >= a && e.ms <= b; }); };
+  function issues(d) {
+    var o = [], add = function (t, m, to) { o.push({ t: t, m: m, to: to }); };
+    var ds = deps(d), dep = ds[0], miss = (d.integrations || []).filter(function (i) { return !i.configured; });
+    if (!d.database || !d.database.ok) add('bad', 'Database is unreachable', H('db'));
+    else if (d.database.latencyMs > cfg.slowMs) add('warn', 'Database is slow (' + d.database.latencyMs + ' ms)', H('db'));
+    if (dep && dep.state === 'ERROR') add('bad', 'Latest deployment failed', H('dep', dep.id));
+    else if (dep && dep.state !== 'READY') add('warn', 'Latest deployment is ' + String(dep.state).toLowerCase(), H('dep', dep.id));
+    if (d.maintenance && d.maintenance.on) add('warn', 'Storefront is in maintenance mode', H('store'));
+    if (miss.length) add('warn', miss.length + ' integration' + (miss.length > 1 ? 's' : '') + ' not configured: ' + miss.map(function (i) { return i.label; }).join(', '), H('cov'));
+    var l = d.logins, ip = l && l.topIps && l.topIps[0];
+    if (ip && ip.count >= cfg.ipFails) add('bad', ip.count + ' failed sign-ins from ' + ip.label + ' in 7 days', H('find', ip.label));
+    else if (l && l.total >= 5 && l.failed / l.total > 0.25) add('warn', 'High failed sign-in rate: ' + l.failed + ' of ' + l.total, H('sec'));
+    var a = d.aiHealth;
+    if (a && a.requests >= 5 && a.failures / a.requests >= cfg.aiRate / 100) add('warn', 'AI error rate is ' + Math.round(a.failures / a.requests * 100) + '%', H('ai'));
+    var ac = d.accounts;
+    if (ac && ac.faceLocked) add('warn', ac.faceLocked + ' account' + (ac.faceLocked > 1 ? 's' : '') + ' face-locked', H('sec'));
+    mons(d.uptime).forEach(function (m) { if (m.state === 'down') add('bad', m.name + ' is down', H('store')); });
+    var rej = (d.appBuilds ? d.appBuilds.list : []).filter(function (b) { return b.status === 'rejected'; });
+    if (rej.length) add('warn', rej.length + ' rejected app build' + (rej.length > 1 ? 's' : ''), H('build'));
+    return o;
+  }
+
+  // ---- charts ---------------------------------------------------------------------------
+  var kpis = function (a) { return '<dl class="cto-kpis">' + a.map(function (k) { return '<div><dt>' + k[0] + '</dt><dd>' + k[1] + '</dd></div>'; }).join('') + '</dl>'; };
+  // Live database latency from real readings collected on each refresh. Click a point for details.
+  function latency() {
+    var w = RANGES[st.range], head = '<div class="cto-tabs" role="group" aria-label="Time range">' + Object.keys(RANGES).map(function (k) { return btn('range', k, k, st.range === k); }).join('') + '</div>';
+    if (w > 36e5) { st.win = []; return head + unavail('Latency history longer than one hour', 'stored readings, for example a table written by a scheduled health check'); }
+    var since = Date.now() - w, b = st.win = st.buf.filter(function (p) { return p.t >= since; }), n = b.length;
+    if (!n) return head + empty('No readings in this window yet. A reading is taken on every refresh.');
+    var v = b.map(function (p) { return p.ms; }).filter(ok), sorted = v.slice().sort(function (a, c) { return a - c; });
+    var P = function (p) { return sorted.length ? sorted[Math.min(sorted.length - 1, Math.ceil(sorted.length * p / 100) - 1)] + ' ms' : '—'; };
+    var hi = Math.max.apply(null, v.concat(0)) * 1.25 || 1, X = function (i) { return n < 2 ? 50 : i / (n - 1) * 100; }, Y = function (m) { return 96 - m / hi * 92; };
+    var segs = [], cur = null, ticks = '';
+    b.forEach(function (p, i) {
+      if (p.ms == null) { cur = null; ticks += '<i class="cto-x" style="left:' + X(i) + '%"></i>'; return; }
+      if (!cur) segs.push(cur = []);
+      cur.push(X(i).toFixed(2) + ' ' + Y(p.ms).toFixed(2));
+    });
+    var line = segs.map(function (s) { return 'M' + s.join('L'); }).join('');
+    var area = segs.map(function (s) { return 'M' + s[0].split(' ')[0] + ' 100L' + s.join('L') + 'L' + s[s.length - 1].split(' ')[0] + ' 100Z'; }).join('');
+    var lp = b[n - 1], dot = lp.ms == null ? '' : '<i class="cto-pt" style="left:' + X(n - 1) + '%;top:' + Y(lp.ms) + '%"></i>';
+    var sel = st.sel && b.filter(function (p) { return p.t === st.sel; })[0], mark = sel ? '<i class="cto-cur" style="left:' + X(b.indexOf(sel)) + '%"></i>' : '';
+    var detail = sel ? '<div class="cto-gap"></div>' + kv([['Timestamp', when(sel.t)], ['Latency', sel.ms == null ? 'No reading' : sel.ms + ' ms'], ['Result', raw(sel.ms == null ? pill('Failed', 'bad') : pill('Success', 'ok'))], ['P50 in this window', P(50)], ['P95 in this window', P(95)], ['Peak in this window', sorted.length ? sorted[sorted.length - 1] + ' ms' : '—'], ['Failure reason', show(sel.err, 'None')]]) : '<p class="cto-note">Click a point on the graph for its details. Red marks are failed readings.</p>';
+    return head + '<div class="cto-plot" role="img" aria-label="Database latency, ' + n + ' readings, latest ' + (lp.ms == null ? 'failed' : lp.ms + ' milliseconds') + '">' +
+      '<svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"><path class="cto-ar" d="' + area + '"/><path class="cto-ln" d="' + line + '"/></svg>' +
+      '<span class="cto-yl" style="top:2px">' + Math.round(hi) + ' ms</span><span class="cto-yl" style="bottom:2px">0</span>' + ticks + mark + dot +
+      '<i class="cto-cur" id="cto-cur" hidden></i><span class="cto-tip" id="cto-tip" hidden></span></div>' +
+      '<div class="cto-xl"><span>' + hm(b[0].t) + '</span><span>Now</span></div>' +
+      kpis([['Now', lp.ms == null ? 'Failed' : lp.ms + ' ms'], ['P50', P(50)], ['P95', P(95)], ['P99', P(99)], ['Peak', sorted.length ? sorted[sorted.length - 1] + ' ms' : '—'], ['Readings', n], ['Failed', n - v.length]]) + detail;
+  }
+  function hours(h, okL, badL) {
+    if (!h) return empty('No data for the last 24 hours.');
+    var tot = h.ok.map(function (v, i) { return v + h.failed[i]; }), mx = Math.max.apply(null, tot.concat(1));
+    var sum = function (a) { return a.reduce(function (x, y) { return x + y; }, 0); }, o = sum(h.ok), bad = sum(h.failed), all = o + bad;
+    var cs = h.ok.map(function (v, i) {
+      var f = h.failed[i];
+      return '<div class="cto-col" title="' + hm(h.start + i * HOUR) + ': ' + v + ' ' + okL + ', ' + f + ' ' + badL + '"><i class="cto-seg f" style="height:' + f / mx * 100 + '%;min-height:' + (f ? 2 : 0) + 'px"></i><i class="cto-seg" style="height:' + v / mx * 100 + '%;min-height:' + (v ? 2 : 0) + 'px"></i></div>';
+    }).join('');
+    var xl = [0, 6, 12, 18].map(function (i) { return '<span>' + hm(h.start + i * HOUR) + '</span>'; }).join('') + '<span>Now</span>', peak = tot.indexOf(Math.max.apply(null, tot));
+    return '<div class="cto-bars" role="img" aria-label="Hourly ' + okL + ' and ' + badL + ' counts, last 24 hours">' + cs + '</div><div class="cto-xl">' + xl + '</div>' +
+      kpis([['Total', num(all)], [cap(okL), num(o)], [cap(badL), num(bad)], ['Failure rate', all ? (bad / all * 100).toFixed(1) + '%' : '0%'], ['Busiest hour', all ? hm(h.start + peak * HOUR) : '—']]);
+  }
+
+  // ---- pages ----------------------------------------------------------------------------
+  function vHome(d) {
+    var ds = deps(d), dep = ds[0] || null, ab = d.appBuilds, ints = d.integrations || [], iss = issues(d), db = d.database, l = d.logins, a = d.aiHealth;
+    var worst = iss.some(function (i) { return i.t === 'bad'; }) ? 'bad' : iss.length ? 'warn' : 'ok';
+    var good = ds.filter(function (x) { return x.state === 'READY'; }).length, rate = ds.length ? good / ds.length : null, intOk = ints.filter(function (i) { return i.configured; }).length;
+    var hero = '<section class="cto-hero t-' + worst + '" aria-label="System status"><h2>' + { ok: 'No issues detected', warn: 'Needs attention', bad: 'Action required' }[worst] + '</h2>' +
+      (iss.length ? '<ul class="cto-issues">' + iss.map(function (i) { return '<li class="t-' + i.t + '">' + lnk(i.to, i.m) + '</li>'; }).join('') + '</ul>' : '<p>Checked the database, deployments, sign-ins, AI, integrations and storefront. Other systems are not monitored yet.</p>') + '</section>';
+    var health = tiles([
+      tile('Database', db && db.ok ? 'Healthy' : 'Unreachable', db && ok(db.latencyMs) ? 'Latency ' + db.latencyMs + ' ms' : db && db.error, db && db.ok ? (db.latencyMs > cfg.slowMs ? 'warn' : 'ok') : 'bad', H('db')),
+      tile('Authentication', l ? num(l.failed) + ' failed' : null, l ? 'of ' + num(l.total) + ' sign-ins, 7 days' : 'Monitoring error', l ? (l.failed ? 'warn' : 'ok') : 'bad', H('sec')),
+      tile('AI', a ? num(a.failures) + ' errors' : null, a ? 'of ' + num(a.requests) + ' requests, 7 days' : 'Monitoring error', a ? (a.failures ? 'warn' : 'ok') : 'bad', H('ai')),
+      tile('Deployments', dep ? dep.state : (d.deployments && d.deployments.configured === false ? 'Not connected' : null), dep && ms(dep.createdAt) ? ago(dep.createdAt) : '', dep ? dtone(dep.state) : '', H('dep')),
+      tile('Deploy success', rate == null ? null : Math.round(rate * 100) + '%', ds.length ? good + ' of ' + ds.length + ' recent' : '', rate == null ? '' : rate === 1 ? 'ok' : rate >= 0.8 ? 'warn' : 'bad', H('dep')),
+      tile('Storefront', d.maintenance ? (d.maintenance.on ? 'Maintenance on' : 'Live') : null, d.maintenance && d.maintenance.on ? d.maintenance.reason : '', d.maintenance ? (d.maintenance.on ? 'bad' : 'ok') : '', H('store')),
+      tile('Mobile builds', ab ? num(ab.live) + ' live' : null, ab ? num(ab.inProgress) + ' in progress' : '', '', H('build')),
+      tile('Integrations', intOk + ' of ' + ints.length, 'keys set, health not measured', intOk === ints.length ? 'ok' : 'warn', H('cov'))
+    ]);
+    var nc = '<p class="cto-un"><b>DATA UNAVAILABLE</b>API metrics, payments, backups, email, SMS, storage, logs, incidents and the audit log have no connected source. ' + lnk(H('cov'), 'See what each one needs') + '</p>';
+    var tl = evs(d).filter(function (e) { return e.sev !== 'ok' || e.svc === 'deploy' || e.svc === 'build'; }).slice(0, 12);
+    return hero + changesSec() + health + nc + sec('Live database latency', latency() + '<p class="cto-more">' + lnk(H('db'), 'Open database health') + '</p>', 'Real readings, one per refresh', 'light') +
+      sec('Recent activity', evTbl(tl, 'No recent events.') + '<p class="cto-more">' + lnk(H('events'), 'Open event explorer') + '</p>', 'Real events, newest first. Click for details');
+  }
+  function vDb(d) {
+    var db = d.database;
+    return crumb([['Database health']]) + sec('Database latency', latency(), 'Readings are taken on every refresh while a dashboard is open', 'light') +
+      sec('Current status', kv([['Status', raw(db && db.ok ? pill('Healthy', 'ok') : pill('Unreachable', 'bad'))], ['Latest latency', db && ok(db.latencyMs) ? db.latencyMs + ' ms' : 'No reading'], ['Checked at', when(db && db.checkedAt)], ['Last error', db && db.error ? db.error : 'None'], ['Check performed', 'One read of the admins table']])) +
+      sec('Not measured', unavail('Connections, storage and slow queries', 'pg_stat access or the Supabase management API') + unavail('Database error log and stored latency history', 'a log source and a table of stored readings')) +
+      sec('Recent deployments', tbl(['Status', 'Deployment', 'When'], deps(d).slice(0, 5).map(function (x) { return [raw(pill(show(x.state), dtone(x.state))), depLink(x), ms(x.createdAt) ? ago(x.createdAt) : '—']; }), 'No deployments to show.', deps(d).slice(0, 5).map(function (x) { return H('dep', x.id); })), 'Compare with latency changes');
+  }
+  var secTbl = function (list, none) {
+    return tbl(['When', 'Result', 'IP', 'Account', 'Reason'], list.map(function (e) { var ip = e.ip || 'Unknown IP'; return [ms(e.at) ? ago(e.at) : '—', raw(pill(e.success ? 'Succeeded' : 'Failed', e.success ? 'ok' : 'warn')), raw(lnk(H('find', ip), ip)), e.username, e.reason || '—']; }), none, list.map(function (e) { return H('sec', e.key); }));
+  };
+  function vSec(d, id) {
+    var l = d.logins, ac = d.accounts;
+    if (!l) return crumb([['Security Center']]) + sec('Security Center', na(null, null, 'The sign-in log'));
+    var list = l.events || [];
+    if (id) { var e = list.filter(function (x) { return x.key === id; })[0]; return e ? vSecEv(d, e, list) : gone('Security event', H('sec')); }
+    var shown = list.filter(function (x) { return st.sf === 'all' || (st.sf === 'fail' ? !x.success : x.success); }).slice(0, 40);
+    return crumb([['Security Center']]) + tiles([tile('Failed sign-ins', num(l.failed), '7 days', l.failed ? 'warn' : 'ok'), tile('Sign-ins', num(l.total), '7 days'),
+      tile('Active accounts', ac ? num(ac.active) : null), tile('Face enrolled', ac ? num(ac.faceEnrolled) + ' of ' + num(ac.active) : null, '', ac ? (ac.faceEnrolled < ac.active ? 'warn' : 'ok') : ''), tile('Face-locked', ac ? num(ac.faceLocked) : null, '', ac ? (ac.faceLocked ? 'bad' : 'ok') : '')]) +
+      sec('Sign-ins, last 24 hours', hours(l.hourly, 'successful', 'failed'), 'Hourly totals', 'light') +
+      sec('Top failing IPs', tbl(['IP address', 'Failed attempts'], (l.topIps || []).map(function (x) { return [raw(lnk(H('find', x.label), x.label)), num(x.count)]; }), 'No failed sign-ins in the last 7 days.', (l.topIps || []).map(function (x) { return H('find', x.label); })), 'Last 7 days. Click to investigate') +
+      sec('Sign-in events', '<div class="cto-chips">' + [['all', 'All'], ['fail', 'Failed'], ['ok', 'Succeeded']].map(function (c) { return btn('sf', c[0], c[1], st.sf === c[0]); }).join('') + '</div>' + secTbl(shown, 'No events match.'), 'Latest ' + list.length + ' recorded. Click one for details');
+  }
+  function vSecEv(d, e, list) {
+    var ip = e.ip || 'Unknown IP', same = list.filter(function (x) { return x.key !== e.key && (x.ip || 'Unknown IP') === ip; }), fails = same.filter(function (x) { return !x.success; }).length + (e.success ? 0 : 1), dp = lastDeploy(d, e.at);
+    return crumb([['Security Center', H('sec')], ['Event']]) + sec('Security event', kv([['Event ID', e.id], ['Timestamp', when(e.at)], ['Result', raw(pill(e.success ? 'Succeeded' : 'Failed', e.success ? 'ok' : 'warn'))], ['IP address', raw(lnk(H('find', ip), ip))], ['Account identifier', e.username], ['Failure reason', e.success ? 'Not applicable' : show(e.reason, 'Not recorded by the login log')], ['Method', e.method], ['Device', e.agent],
+      ['Risk indicator', fails + ' failed attempt' + (fails === 1 ? '' : 's') + ' from this IP in the latest ' + list.length + ' events' + (fails >= cfg.ipFails ? ', at or above your alert threshold of ' + cfg.ipFails : '')], ['Account status', 'Not linked to login events'], ['Latest deployment before this event', dp ? depLink(dp) : 'None in the loaded deployments']]), 'Passwords, tokens and biometric data are never shown') +
+      sec('Other events from this IP', secTbl(same.slice(0, 10), 'No other events from this IP in the loaded data.'), same.length + ' found');
+  }
+  function vAi(d) {
+    var a = d.aiHealth;
+    if (!a) return crumb([['AI monitoring']]) + sec('AI monitoring', na(null, null, 'The AI usage log'));
+    var f = a.fields || {}, tot = a.models ? a.models.reduce(function (s, m) { return { t: s.t + (m.tokens || 0), c: s.c + (m.cost || 0) }; }, { t: 0, c: 0 }) : null;
+    var mk = function (m) { return (m.provider || '') + '|' + (m.model || ''); };
+    return crumb([['AI monitoring']]) + tiles([tile('Requests', num(a.requests), '7 days'), tile('Failures', num(a.failures), (a.requests ? Math.round(a.failures / a.requests * 1000) / 10 : 0) + '% error rate', a.failures ? 'warn' : 'ok'),
+      tile('Tokens', f.tokens && tot ? num(tot.t) : null, f.tokens ? '' : 'Not recorded'), tile('Cost (recorded)', f.cost && tot ? tot.c.toFixed(4) : null, f.cost ? 'Sum of the cost column' : 'Not recorded')]) +
+      sec('AI requests, last 24 hours', hours(a.hourly, 'successful', 'failed'), 'Hourly totals', 'light') +
+      sec('Providers and models', a.models ? tbl(['Provider', 'Model', 'Requests', 'Failures', 'P95 latency', 'Tokens', 'Cost'], a.models.map(function (m) { return [m.provider, m.model, num(m.requests), num(m.failures), ok(m.p95Ms) ? m.p95Ms + ' ms' : '—', ok(m.tokens) ? num(m.tokens) : '—', ok(m.cost) ? m.cost : '—']; }), '', a.models.map(function (m) { return H('find', m.model || m.provider); })) : unavail('The provider and model breakdown', 'provider or model columns in ai_usage_logs (none found)'), 'Last 7 days. Click to see events') +
+      sec('Most common errors', a.topErrors && a.topErrors.length ? bars(a.topErrors.map(function (x) { return { label: x.label, value: x.count, tone: 'bad' }; })) : empty('No AI errors in the last 7 days.'), 'Last 7 days') +
+      sec('Failed requests', tbl(['When', 'Provider and model', 'Error'], (a.events || []).slice(0, 30).map(function (e) { return [ms(e.at) ? ago(e.at) : '—', [e.provider, e.model].filter(ok).join(' / ') || '—', e.error]; }), 'No failed requests in the last 7 days.', (a.events || []).slice(0, 30).map(function (e) { return H('aiev', e.key); })), 'Latest ' + (a.events || []).length + '. Click one for details');
+  }
+  function vAiEv(d, id) {
+    var a = d.aiHealth, e = a && (a.events || []).filter(function (x) { return x.key === id; })[0];
+    if (!e) return gone('AI failure', H('ai'));
+    var same = (a.events || []).filter(function (x) { return x.key !== e.key && x.error === e.error; }), dp = lastDeploy(d, e.at);
+    return crumb([['AI monitoring', H('ai')], ['Failure']]) + sec('AI failure', kv([['Timestamp', when(e.at)], ['Provider', e.provider], ['Model', e.model], ['Error type', e.type], ['Latency', ok(e.latencyMs) ? e.latencyMs + ' ms' : null], ['Error', e.error], ['Latest deployment before this event', dp ? depLink(dp) : 'None in the loaded deployments']]), 'Tokens and cost are not stored per failed request') +
+      sec('Same error', tbl(['When', 'Provider and model'], same.slice(0, 10).map(function (x) { return [ms(x.at) ? ago(x.at) : '—', [x.provider, x.model].filter(ok).join(' / ') || '—']; }), 'No other failures with this error.', same.slice(0, 10).map(function (x) { return H('aiev', x.key); })), same.length + ' other');
+  }
+  function vDep(d, id) {
+    var x = d.deployments;
+    if (!x) return crumb([['Deployments']]) + sec('Deployments', na(null, null, 'Deployments'));
+    if (x.configured === false) return crumb([['Deployments']]) + sec('Deployments', unavail('Deployments', 'VERCEL_API_TOKEN and VERCEL_PROJECT_ID'));
+    var list = x.deployments || [], i = list.findIndex(function (y) { return y.id === id; });
+    if (!id) return crumb([['Deployments']]) + sec('Recent deployments', tbl(['Status', 'Environment', 'Branch', 'When', 'Commit'], list.map(function (y) { return [raw(pill(show(y.state), dtone(y.state))), y.target, y.branch, ms(y.createdAt) ? ago(y.createdAt) : '—', y.commitMessage]; }), 'Vercel returned no deployments.', list.map(function (y) { return H('dep', y.id); })), 'Vercel. Click one for details');
+    if (i < 0) return gone('Deployment', H('dep'));
+    var y = list[i], ar = around(d, y.createdAt), older = list[i + 1], newer = list[i - 1];
+    return crumb([['Deployments', H('dep')], [show(y.id)]]) + sec('Deployment', kv([['Deployment ID', y.id], ['Status', raw(pill(show(y.state), dtone(y.state)))], ['Environment', y.target], ['Commit SHA', ghLink(y)], ['Commit message', y.commitMessage], ['Branch', y.branch], ['Author', y.author], ['Started', when(y.createdAt)], ['Ready', when(y.readyAt)], ['Build duration', y.buildingAt && y.readyAt ? Math.round((y.readyAt - y.buildingAt) / 1000) + ' s' : null],
+      ['URL', /^[\w.-]+$/.test(y.url || '') ? raw('<a class="cto-link" href="https://' + esc(y.url) + '" target="_blank" rel="noopener noreferrer">' + esc(y.url) + '</a>') : null], ['Build and runtime logs', y.inspectorUrl && /^https:\/\//.test(y.inspectorUrl) ? raw('<a class="cto-link" href="' + esc(y.inspectorUrl) + '" target="_blank" rel="noopener noreferrer">Open in Vercel</a>') : 'Not provided by Vercel']]), 'From the Vercel API') +
+      sec('Events in the hour after this deployment started', tbl(['When', 'Service', 'Event', 'Detail'], ar.map(function (e) { return [ago(e.at), raw(pill(SVC[e.svc], 'warn')), raw(lnk(e.to, e.title)), e.sub]; }), 'No failed sign-ins or AI failures recorded in that hour.', ar.map(function (e) { return e.to; })), 'Same time window only; this does not prove a cause') +
+      sec('Not connected', unavail('Health checks after a deployment', 'stored health-check history') + unavail('Rollback', 'a server-side action with authorization, confirmation and audit logging')) +
+      '<p class="cto-more">' + (newer ? lnk(H('dep', newer.id), 'Newer deployment') + ' ' : '') + (older ? lnk(H('dep', older.id), 'Older deployment') : '') + '</p>';
+  }
+  function vBuild(d, id) {
+    var ab = d.appBuilds;
+    if (!ab) return crumb([['Mobile builds']]) + sec('Mobile builds', na(null, null, 'App build records'));
+    var tone = function (s) { return s === 'live' ? 'ok' : s === 'rejected' ? 'bad' : 'warn'; };
+    if (id) {
+      var b = ab.list.filter(function (x) { return String(x.id) === id; })[0]; if (!b) return gone('App build', H('build'));
+      return crumb([['Mobile builds', H('build')], [(b.platform === 'ios' ? 'iOS ' : 'Android ') + show(b.version)]]) + sec('Release', kv([['Platform', b.platform === 'ios' ? 'iOS' : 'Android'], ['Version', b.version], ['Status', raw(pill(cap(b.status), tone(b.status)))], ['Released on', b.releasedOn], ['Release notes', b.notes]]), 'From app_builds') +
+        sec('Not connected', unavail('Crash rate, ANR rate, version distribution, build logs and commit', 'Play Console, App Store Connect or Crashlytics'));
+    }
+    return crumb([['Mobile builds']]) + sec('Releases', tbl(['Platform', 'Version', 'Status', 'Released', 'Notes'], ab.list.map(function (b) { return [b.platform === 'ios' ? 'iOS' : 'Android', b.version, raw(pill(cap(b.status), tone(b.status))), b.releasedOn, b.notes]; }), 'No app builds recorded yet.', ab.list.map(function (b) { return H('build', b.id); })), 'Android and iOS. Click one for details') +
+      sec('Not connected', unavail('Crash rate, ANR rate and version distribution', 'Play Console, App Store Connect or Crashlytics'));
+  }
+  function vStore(d) {
+    var m = d.maintenance, u = d.uptime;
+    return crumb([['Storefront health']]) + sec('Storefront status', na(m, function (x) { return kv([['Storefront', raw(pill(x.on ? 'Maintenance on' : 'Live', x.on ? 'bad' : 'ok'))], ['Reason', x.on ? x.reason : 'Not in maintenance']]); }, 'The maintenance flag'), 'Maintenance flag') +
+      sec('Uptime monitors', na(u, function (x) {
+        if (x.configured === false) return unavail('Uptime monitors', 'UptimeRobot API credentials');
+        return tbl(['Monitor', 'Status', 'Uptime'], mons(x).map(function (q) { return [q.name, raw(pill(cap(q.state), q.state === 'up' ? 'ok' : q.state === 'down' ? 'bad' : 'warn')), q.ratio == null ? '—' : q.ratio.toFixed(2) + '%']; }), 'No monitors returned.');
+      }, 'Uptime monitors'), 'UptimeRobot') +
+      sec('Component checks', unavail('Homepage, product API, search, cart, checkout, payment and order checks', 'per-component health checks or request logs'));
+  }
+  function vEvents(d, qid) {
+    var f = st.f, q = (qid || f.q || '').toLowerCase(), words = q.split(/\s+/).filter(Boolean);
+    var list = evs(d).filter(function (e) { return (!f.svc || e.svc === f.svc) && (!f.prob || e.sev !== 'ok') && (!f.since || e.ms >= f.since) && words.every(function (w) { return e.hay.indexOf(w) > -1; }); });
+    st.exp = list; var chips = '<div class="cto-chips">' + [['', 'All']].concat(Object.keys(SVC).map(function (k) { return [k, SVC[k]]; })).map(function (c) { return btn('svc', c[0], c[1], f.svc === c[0]); }).join('') + btn('prob', 'p', 'Problems only', f.prob) +
+      (q || f.svc || f.prob || f.since || qid ? '<button type="button" class="cto-btn" data-act="clear">Clear filters</button>' : '') + '<button type="button" class="cto-btn" data-act="csv">Download CSV</button>' + (qid && /^[\d.:a-f]+$/i.test(qid) ? '<button type="button" class="cto-btn" data-copy="' + esc(qid) + '">Copy IP</button>' : '') + '</div>';
+    return crumb([[qid ? 'Search: ' + qid : 'Event explorer']]) + (st.msg ? '<p class="cto-un"><b>NOT EXECUTED</b>' + esc(st.msg) + '</p>' : '') +
+      sec(qid ? 'Results for "' + qid + '"' : 'Event explorer', chips + evTbl(list.slice(0, 200), 'No events match. Only deployments, sign-ins, AI failures and app builds are searchable; logs, payments and incidents are not connected.'), list.length + ' match. Application logs are not connected');
+  }
+  function vCov(d) {
+    var a = d.aiHealth, fl = (a && a.fields) || {}, dp = d.deployments && d.deployments.configured, miss = ['provider', 'model', 'tokens', 'cost'].filter(function (k) { return !fl[k]; });
+    var rows = [
+      ['Database', 'Partial', 'Reachability, latency and failure reason from live readings', 'Stored readings for history; pg_stat access for connections, storage and slow queries'],
+      ['API performance', 'None', 'Nothing', 'A request log table or a Vercel log drain: requests, p50/p95/p99, 4xx/5xx, per endpoint'],
+      ['Authentication and security', d.logins ? 'Connected' : 'Error', 'Sign-in events from admin_logins', 'Per-account status and device details, unless the login log records them'],
+      ['AI', a ? (miss.length ? 'Partial' : 'Connected') : 'Error', 'Requests, failures and errors from ai_usage_logs', miss.length ? 'Columns in ai_usage_logs: ' + miss.join(', ') : 'Nothing more'],
+      ['Deployments', dp ? 'Partial' : 'None', dp ? 'Commit, branch, author, status and timing from Vercel' : 'Nothing', dp ? 'Vercel log APIs for build and runtime logs; a rollback action' : 'VERCEL_API_TOKEN and VERCEL_PROJECT_ID'],
+      ['Storefront', 'Partial', 'Maintenance flag and UptimeRobot monitors', 'Checks for search, cart, checkout and orders'],
+      ['Payments', 'None', 'Nothing', 'A payment provider API or a payments and webhook events table'],
+      ['Mobile releases', d.appBuilds ? 'Partial' : 'Error', 'Build records from app_builds', 'Play Console, App Store Connect or Crashlytics for crash, ANR and version data'],
+      ['Backups', 'None', 'Nothing', 'A backup system API or a backup records table'],
+      ['Email, SMS and storage', 'None', 'Only whether keys are set (below)', 'Provider APIs to measure delivery and usage'],
+      ['Logs', 'None', 'Nothing', 'A log store or Vercel log drain'],
+      ['Incidents and alerts', 'None', 'Detected issues on the overview, computed from live data', 'Incidents and alerts tables that record history and status'],
+      ['Audit log and actions', 'None', 'Nothing', 'Server-side handlers for rollback, acknowledge, resolve and thresholds, each writing an audit record']
+    ], tone = { Connected: 'ok', Partial: 'warn' };
+    return crumb([['Data sources']]) + sec('What is connected', tbl(['Area', 'Status', 'Real data today', 'Needed for the rest'], rows.map(function (r) { return [r[0], raw(pill(r[1] === 'None' ? 'Not connected' : r[1], tone[r[1]] || 'bad')), r[2], r[3]]; })), 'Nothing on this page is simulated') +
+      sec('Integrations', tbl(['Service', 'Status'], (d.integrations || []).map(function (i) { return [i.label, raw(i.configured ? pill('Keys set', 'ok') : pill('Missing ' + i.missing.join(', '), 'warn'))]; }), 'No integrations to check.'), 'Only whether each is set, never the keys. Health is not measured') + copyMissing(d);
+  }
+  function page(d) {
+    var r = route(), v = r.v, id = r.id;
+    return v === 'db' ? vDb(d) : v === 'sec' ? vSec(d, id) : v === 'ai' ? vAi(d) : v === 'aiev' ? vAiEv(d, id) : v === 'dep' ? vDep(d, id) : v === 'build' ? vBuild(d, id) : v === 'store' ? vStore(d) : v === 'events' ? vEvents(d) : v === 'find' ? vEvents(d, id) : v === 'cov' ? vCov(d) : v === 'settings' ? vSettings() : vHome(d);
+  }
+
+  // ---- efficiency tools: settings, navigation, shortcuts, change log, alerts, export --------
+  var DEF = { slowMs: 800, ipFails: 5, aiRate: 10, every: 30, range: '5m', notify: false }, cfg = {};
+  try { cfg = JSON.parse(localStorage.getItem('cto.settings') || '{}') || {}; } catch (e) { cfg = {}; }
+  Object.keys(DEF).forEach(function (k) { if (typeof cfg[k] !== typeof DEF[k] || (typeof DEF[k] === 'number' && !isFinite(cfg[k]))) cfg[k] = DEF[k]; });
+  if (!RANGES[cfg.range]) cfg.range = DEF.range;
+  if ([10, 30, 60].indexOf(cfg.every) < 0) cfg.every = DEF.every;
+  st.every = cfg.every; st.range = cfg.range; st.log = []; st.sort = {}; st.exp = [];
+  var save = function () { try { localStorage.setItem('cto.settings', JSON.stringify(cfg)); } catch (e) {} };
+  var toastT = 0, seen = null, gpend = 0;
+  var GO = { o: '', d: 'db', s: 'sec', a: 'ai', p: 'dep', m: 'build', t: 'store', e: 'events', c: 'cov', ',': 'settings' };
+  var NAV = [['', 'Overview'], ['db', 'Database'], ['sec', 'Security'], ['ai', 'AI'], ['dep', 'Deployments'], ['build', 'Mobile'], ['store', 'Storefront'], ['events', 'Events'], ['cov', 'Data sources'], ['settings', 'Settings']];
+  var toast = function (m) { var t = $('cto-toast'); if (!t) return; t.textContent = m; t.hidden = false; clearTimeout(toastT); toastT = setTimeout(function () { t.hidden = true; }, 2500); };
+  var navHtml = function () { return '<nav class="cto-nav" aria-label="Sections">' + NAV.map(function (n) { return '<a href="' + (n[0] ? H(n[0]) : '#/') + '" data-nav="' + n[0] + '">' + n[1] + '</a>'; }).join('') + '</nav>'; };
+  var toolsHtml = function () { return '<div class="cto-tools"><button type="button" class="cto-btn" data-act="copyrep">Copy status report</button><button type="button" class="cto-btn" data-act="link">Copy link</button><button type="button" class="cto-btn" data-act="wall">Wall mode</button><button type="button" class="cto-btn" data-act="print">Print</button><span id="cto-toast" class="cto-toast" role="status" hidden></span></div>'; };
+  function copyText(t) {
+    var done = function () { toast('Copied to clipboard'); }, fail = function () { toast('Copy failed. Select the text and copy it manually.'); };
+    if (navigator.clipboard && navigator.clipboard.writeText) { navigator.clipboard.writeText(t).then(done, fail); return; }
+    var ta = document.createElement('textarea'); ta.value = t; ta.style.cssText = 'position:fixed;opacity:0'; document.body.appendChild(ta); ta.select();
+    try { if (document.execCommand('copy')) done(); else fail(); } catch (e) { fail(); }
+    document.body.removeChild(ta);
+  }
+  function applySort(tb, c, dir) {
+    var body = tb.tBodies[0]; if (!body) return;
+    var val = function (r) { var t = (r.cells[c] ? r.cells[c].textContent : '').trim(); return /^-?[\d.,]+\s*(ms|s|%)?$/.test(t) ? parseFloat(t.replace(/,/g, '')) : t.toLowerCase(); };
+    [].slice.call(body.rows).sort(function (a, b) { var x = val(a), y = val(b); if (typeof x !== typeof y) { x = String(x); y = String(y); } return (x < y ? -1 : x > y ? 1 : 0) * dir; }).forEach(function (r) { body.appendChild(r); });
+    [].forEach.call(tb.tHead.rows[0].cells, function (h, i) { if (i === c) h.setAttribute('aria-sort', dir > 0 ? 'ascending' : 'descending'); else h.removeAttribute('aria-sort'); });
+  }
+  function sortBy(th) {
+    var tb = th.closest('table'), all = [].slice.call(document.querySelectorAll('#cto-main .cto-tbl')), i = all.indexOf(tb), c = th.cellIndex, key = route().v + ':' + i;
+    if (i < 0 || th.className === 'ns') return;
+    var s = st.sort[key], dir = s && s.c === c ? -s.dir : 1; st.sort[key] = { c: c, dir: dir }; applySort(tb, c, dir);
+  }
+  function afterPaint() {
+    var v = route().v, cur = v === 'home' ? '' : v === 'aiev' ? 'ai' : v === 'find' ? 'events' : v;
+    [].forEach.call(document.querySelectorAll('.cto-nav a'), function (a) { if (a.getAttribute('data-nav') === cur) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); });
+    [].forEach.call(document.querySelectorAll('#cto-main .cto-tbl'), function (tb, i) {
+      [].forEach.call(tb.tHead.rows[0].cells, function (h) { if (/^(when|released)/i.test(h.textContent.trim())) h.className = 'ns'; });
+      var s = st.sort[v + ':' + i]; if (s) applySort(tb, s.c, s.dir);
+    });
+    if (cfg.range !== st.range) { cfg.range = st.range; save(); }
+  }
+  // Issue changes are recorded from real polls while this page is open; nothing is back-filled.
+  function track(d) {
+    var cur = issues(d), keys = {}, now = Date.now();
+    cur.forEach(function (i) { keys[i.to + '|' + i.t + '|' + i.m.replace(/[\d.]+/g, '').replace(/s\b/g, '').replace(/\s+/g, ' ').trim()] = i; });
+    if (seen) {
+      Object.keys(keys).forEach(function (k) { if (!seen[k]) { st.log.unshift({ t: now, on: 1, i: keys[k] }); if (keys[k].t === 'bad') alertNew(keys[k]); } });
+      Object.keys(seen).forEach(function (k) { if (!keys[k]) st.log.unshift({ t: now, on: 0, i: seen[k] }); });
+      st.log = st.log.slice(0, 40);
+    }
+    seen = keys;
+    document.title = (cur.length ? '(' + cur.length + ') ' : '') + 'CTO Operations Center';
+  }
+  function alertNew(i) { try { if (cfg.notify && window.Notification && Notification.permission === 'granted') new Notification('CTO alert', { body: i.m }); } catch (e) {} }
+  function changesSec() {
+    if (!st.log.length) return '';
+    return sec('What changed', tbl(['When', 'Change', 'Issue'], st.log.slice(0, 8).map(function (x) { return [ago(x.t), raw(pill(x.on ? 'Appeared' : 'Cleared', x.on ? x.i.t : 'ok')), raw(lnk(x.i.to, x.i.m))]; }), ''), 'Recorded while this page has been open');
+  }
+  function report(d) {
+    var iss = issues(d), dp = deps(d)[0], db = d.database, l = d.logins, a = d.aiHealth, ab = d.appBuilds, L = [];
+    L.push('CTO status report, ' + new Date().toLocaleString(), 'Data as of ' + new Date(st.at).toLocaleTimeString() + (stale() ? ' (STALE)' : ''), '');
+    L.push(iss.length ? 'Open issues (' + iss.length + '):' : 'No issues detected from the connected sources.');
+    iss.forEach(function (i) { L.push('- [' + i.t.toUpperCase() + '] ' + i.m); });
+    L.push('', 'Database: ' + (db && db.ok ? 'healthy, ' + db.latencyMs + ' ms' : 'unreachable' + (db && db.error ? ' (' + db.error + ')' : '')));
+    L.push('Latest deployment: ' + (dp ? show(dp.state) + ', ' + show(dp.target) + ', ' + (dp.commitMessage ? dp.commitMessage.slice(0, 80) : 'no commit message') + ', ' + when(dp.createdAt) : 'not available'));
+    L.push('Sign-ins, 7 days: ' + (l ? l.failed + ' failed of ' + l.total : 'unavailable'), 'AI, 7 days: ' + (a ? a.failures + ' errors of ' + a.requests + ' requests' : 'unavailable'), 'App builds: ' + (ab ? ab.live + ' live, ' + ab.inProgress + ' in progress' : 'unavailable'));
+    L.push('', 'Not monitored: API metrics, payments, backups, logs, incidents, audit log.');
+    return L.join('\n');
+  }
+  var ghLink = function (y) {
+    var sha = /^[0-9a-f]{7,40}$/i.test(y.sha || '') ? y.sha : '';
+    if (!sha) return y.sha || null;
+    return raw(esc(sha.slice(0, 10)) + (y.repo && /^[\w.-]+\/[\w.-]+$/.test(y.repo) ? ' <a class="cto-link" href="https://github.com/' + esc(y.repo) + '/commit/' + sha + '" target="_blank" rel="noopener noreferrer">View on GitHub</a>' : '') + ' <button type="button" class="cto-btn" data-copy="' + sha + '">Copy</button>');
+  };
+  var copyMissing = function (d) {
+    var m = []; (d.integrations || []).forEach(function (i) { (i.missing || []).forEach(function (v) { if (m.indexOf(v) < 0) m.push(v); }); });
+    return m.length ? '<p class="cto-more"><button type="button" class="cto-btn" data-copy="' + esc(m.join('\n')) + '">Copy ' + m.length + ' missing variable name' + (m.length > 1 ? 's' : '') + '</button></p>' : '';
+  };
+  var X = {
+    copyrep: function () { if (st.d) copyText(report(st.d)); },
+    link: function () { copyText(location.href); },
+    print: function () { window.print(); },
+    wall: function () { var r = $('cto-root'); if (!r) return; r.classList.toggle('wall'); toast(r.classList.contains('wall') ? 'Wall mode on. Press W to leave.' : 'Wall mode off'); },
+    csv: function () {
+      var list = st.exp || []; if (!list.length) { toast('Nothing to export'); return; }
+      var q = function (v) { v = v == null ? '' : String(v); if (/^[=+\-@\t\r]/.test(v)) v = "'" + v; return '"' + v.replace(/"/g, '""') + '"'; };
+      var rows = [['Time', 'Service', 'Severity', 'Event', 'Detail']].concat(list.map(function (e) { return [e.ms ? new Date(e.ms).toISOString() : '', SVC[e.svc], e.sev, e.title, e.sub]; }));
+      var a = document.createElement('a'); a.href = URL.createObjectURL(new Blob(['\ufeff' + rows.map(function (r) { return r.map(q).join(','); }).join('\r\n')], { type: 'text/csv;charset=utf-8' }));
+      a.download = 'cto-events-' + new Date().toISOString().slice(0, 10) + '.csv'; document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000); toast('Downloaded ' + list.length + ' rows');
+    },
+    reset: function () { Object.keys(DEF).forEach(function (k) { cfg[k] = DEF[k]; }); st.every = cfg.every; st.range = cfg.range; save(); var s = $('cto-int'); if (s) s.value = st.every; toast('Defaults restored'); paint(); tick(); }
+  };
+  function onKey(e) {
+    var t = e.target, tag = t && t.tagName;
+    if (e.ctrlKey || e.metaKey || e.altKey || tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || (t && t.isContentEditable)) return;
+    var k = e.key;
+    if (gpend && Date.now() - gpend < 1500) { gpend = 0; if (GO.hasOwnProperty(k)) { e.preventDefault(); location.hash = GO[k] ? H(GO[k]) : '#/'; } return; }
+    if (k === '/') { e.preventDefault(); var q = $('cto-q'); if (q) q.focus(); }
+    else if (k === 'g') gpend = Date.now();
+    else if (k === 'r') refresh();
+    else if (k === 'w') X.wall();
+    else if (k === '?') location.hash = H('settings');
+  }
+  function wireExtras() {
+    document.addEventListener('keydown', onKey);
+    document.addEventListener('change', function (e) {
+      var t = e.target, k = t.getAttribute && t.getAttribute('data-cfg');
+      if (t.id === 'cto-int') { cfg.every = +t.value; save(); return; }
+      if (!k) return;
+      if (k === 'notify') { cfg.notify = t.checked; if (t.checked && window.Notification && Notification.permission === 'default') Notification.requestPermission(); }
+      else { var n = Math.round(+t.value), lo = +t.min, hi = +t.max; cfg[k] = isFinite(n) ? Math.min(hi, Math.max(lo, n)) : DEF[k]; t.value = cfg[k]; }
+      save(); toast('Saved in this browser');
+    });
+  }
+  function vSettings() {
+    var n = function (k, label, lo, hi, unit) { return '<label class="cto-set"><span>' + label + '</span><input type="number" inputmode="numeric" data-cfg="' + k + '" min="' + lo + '" max="' + hi + '" value="' + cfg[k] + '"> ' + unit + '</label>'; };
+    return crumb([['Settings']]) +
+      sec('Alert thresholds', '<div class="cto-setgrid">' + n('slowMs', 'Database is slow above', 50, 10000, 'ms') + n('ipFails', 'Flag an IP after', 1, 100, 'failed sign-ins') + n('aiRate', 'Flag AI errors at', 1, 100, '% of requests') + '</div><p class="cto-note">These decide what this dashboard flags as an issue. They are saved in this browser only, not as server-side alert rules.</p>', 'Saved in this browser') +
+      sec('Notifications', '<label class="cto-set"><input type="checkbox" data-cfg="notify"' + (cfg.notify ? ' checked' : '') + '> Desktop notification when a critical issue appears</label><p class="cto-note">Browser permission: ' + esc(window.Notification ? Notification.permission : 'not supported here') + '. Works while this tab is open. The tab title always shows the number of open issues.</p>', 'Optional') +
+      sec('Keyboard shortcuts', tbl(['Key', 'Action'], [['/', 'Focus search'], ['g, then o d s a p m t e c or ,', 'Go to Overview, Database, Security, AI, Deployments, Mobile, Storefront, Events, Data sources or Settings'], ['r', 'Run health check'], ['w', 'Wall mode for a second screen'], ['?', 'Open this page']]), 'Ignored while typing in a field') +
+      '<p class="cto-more"><button type="button" class="cto-btn" data-act="reset">Restore defaults</button></p>';
+  }
+
+  RD.boot({
+    role: 'CTO',
+    render: function (d) {
+      st.d = d;
+      if (Date.now() - st.at > 2000) sample(d);
+      st.at = Date.now();
+      track(d);
+      if (!st.wired) { st.wired = true; setTimeout(wire, 0); }
+      setTimeout(status, 0);
+      return '<div id="cto-root"><div id="cto-top">' + top() + '</div><div id="cto-main">' + page(d) + '</div></div>';
+    }
+  });
+})();
+</script>
+</body>
+</html>
