@@ -433,7 +433,7 @@ tbody tr:hover{background:rgba(255,255,255,.02)}
       <div class="wordmark-sub">Admin panel</div>
       <div class="nav-item active" data-tab="dashboard"><svg class="icon"><use href="#i-dash"/></svg>Dashboard</div>
       <div class="nav-item" data-tab="mydashboard"><svg class="icon"><use href="#i-bolt"/></svg>My Dashboard</div>
-      <div class="nav-item disabled"><svg class="icon"><use href="#i-trend"/></svg>Analytics <span class="tag">Soon</span></div>
+      <div class="nav-item" data-tab="analytics"><svg class="icon"><use href="#i-trend"/></svg>Analytics</div>
       <div class="nav-item" data-tab="products"><svg class="icon"><use href="#i-box"/></svg>Products</div>
       <div class="nav-item" data-tab="orders"><svg class="icon"><use href="#i-cart"/></svg>Orders</div>
       <div class="nav-item disabled"><svg class="icon"><use href="#i-users"/></svg>Customers <span class="tag">Soon</span></div>
@@ -906,6 +906,51 @@ tbody tr:hover{background:rgba(255,255,255,.02)}
         </div>
 
         <div id="mydash-content"><div class="empty-state">Loading…</div></div>
+      </div>
+
+      <!-- Analytics -->
+      <div class="tab-view" id="tab-analytics" style="display:none">
+        <div class="topbar">
+          <div><h1>Analytics</h1><div class="sub">Real numbers only — nothing on this page is a guess.</div></div>
+          <button class="link-btn" id="logout-btn-analytics">Log out</button>
+        </div>
+
+        <div class="stat-grid-sm" style="max-width:none;grid-template-columns:repeat(4,1fr)">
+          <div class="stat-card glass"><div class="num" id="an-revenue">—</div><div class="label">Revenue (30d)</div></div>
+          <div class="stat-card glass"><div class="num" id="an-orders">—</div><div class="label">Orders (30d)</div></div>
+          <div class="stat-card glass"><div class="num" id="an-aov">—</div><div class="label">Avg order value</div></div>
+          <div class="stat-card glass"><div class="num" id="an-customers">—</div><div class="label">Total customers</div></div>
+        </div>
+
+        <div class="dash-grid">
+          <div class="panel glass">
+            <div class="panel-hdr"><h2>Revenue Trend</h2><span class="soon-badge">Last 30 days</span></div>
+            <div id="an-revenue-chart"><div class="placeholder-chart"><svg class="icon"><use href="#i-chart"/></svg>Loading…</div></div>
+          </div>
+          <div class="panel glass">
+            <div class="panel-hdr"><h2>Orders by Status</h2><span class="soon-badge">Live</span></div>
+            <div id="an-status-donut"><div class="empty-state">Loading…</div></div>
+          </div>
+        </div>
+
+        <div class="dash-row3">
+          <div class="panel glass">
+            <div class="panel-hdr"><h2>Product Mix by Category</h2><span class="soon-badge">By product mix</span></div>
+            <div id="an-category-donut"><div class="empty-state">Loading…</div></div>
+          </div>
+          <div class="panel glass" style="grid-column:span 2">
+            <div class="panel-hdr"><h2>Forecast — trailing 14-day trend</h2></div>
+            <div id="an-forecast"><div class="empty-state">Loading…</div></div>
+          </div>
+        </div>
+
+        <div class="panel glass">
+          <div class="panel-hdr"><h2>Visitor / Traffic Analytics</h2><span class="soon-badge">Coming soon</span></div>
+          <div class="placeholder-chart">
+            <svg class="icon"><use href="#i-chart"/></svg>
+            Page-view and visitor analytics need a tracker wired into the storefront first — not shown here as guessed numbers.
+          </div>
+        </div>
       </div>
 
       <!-- Org Chart -->
@@ -1619,7 +1664,7 @@ document.getElementById('face-enroll-capture-btn').addEventListener('click', asy
 document.getElementById('setup-faceid-btn').addEventListener('click', () => openFaceEnroll({ skippable: true }));
 document.getElementById('nav-set-faceid').addEventListener('click', () => openFaceEnroll({ skippable: true }));
 
-['logout-btn', 'logout-btn-2', 'logout-btn-3', 'logout-btn-4', 'logout-btn-5', 'logout-btn-orders', 'logout-btn-reports', 'logout-btn-integrations', 'logout-btn-system', 'logout-btn-marketing', 'logout-btn-orgchart', 'logout-btn-mydashboard', 'logout-btn-maintenance', 'logout-btn-finance', 'logout-btn-inventory', 'logout-btn-returns'].forEach((id) => {
+['logout-btn', 'logout-btn-2', 'logout-btn-3', 'logout-btn-4', 'logout-btn-5', 'logout-btn-orders', 'logout-btn-reports', 'logout-btn-integrations', 'logout-btn-system', 'logout-btn-marketing', 'logout-btn-orgchart', 'logout-btn-mydashboard', 'logout-btn-maintenance', 'logout-btn-finance', 'logout-btn-inventory', 'logout-btn-returns', 'logout-btn-analytics'].forEach((id) => {
   document.getElementById(id).addEventListener('click', () => { clearToken(); showLogin(); });
 });
 
@@ -1682,6 +1727,7 @@ document.querySelectorAll('.nav-item[data-tab]').forEach((item) => {
     if (item.dataset.tab === 'finance') loadFinanceOverview();
     if (item.dataset.tab === 'inventory') loadInventoryOverview();
     if (item.dataset.tab === 'returns') loadReturnsList();
+    if (item.dataset.tab === 'analytics') loadAnalyticsTab();
   });
 });
 
@@ -2929,6 +2975,139 @@ async function loadDashboardActivity() {
     // sub-admins without access to login logs simply don't see this widget's live feed
     badge.textContent = 'Unavailable';
     el.innerHTML = '<div class="empty-state">Login activity is visible to Super Admins.</div>';
+  }
+}
+
+/* ---------- Analytics tab (real data only — reuses existing endpoints,
+   nothing here is a fabricated number) ---------- */
+async function loadAnalyticsTab() {
+  loadAnalyticsSummary();
+  loadAnalyticsCategoryDonut();
+  loadAnalyticsForecast();
+}
+
+async function loadAnalyticsSummary() {
+  const revEl = document.getElementById('an-revenue');
+  const ordEl = document.getElementById('an-orders');
+  const aovEl = document.getElementById('an-aov');
+  const custEl = document.getElementById('an-customers');
+  const chartEl = document.getElementById('an-revenue-chart');
+  const statusEl = document.getElementById('an-status-donut');
+
+  try {
+    const data = await api('/api/order?action=stats');
+    revEl.textContent = formatInr(data.totalRevenue);
+    custEl.textContent = data.totalCustomers ?? '0';
+    ordEl.textContent = data.totalOrders ?? '0';
+    const aov = data.totalOrders ? Math.round((data.totalRevenue || 0) / data.totalOrders) : 0;
+    aovEl.textContent = formatInr(aov);
+
+    const trend = data.revenueTrend || [];
+    if (!trend.length) {
+      chartEl.innerHTML = '<div class="rev-empty">No paid orders in the last 30 days yet.</div>';
+    } else {
+      const max = Math.max(...trend.map((t) => t.amount), 1);
+      chartEl.innerHTML = `<div class="rev-chart">${trend.map((t) => {
+        const h = Math.max(4, Math.round((t.amount / max) * 170));
+        const d = new Date(t.date);
+        const label = `${d.getDate()}/${d.getMonth() + 1}: ${formatInr(t.amount)}`;
+        return `<div class="rev-bar-col" title="${escapeHtml(label)}"><div class="rev-bar" style="height:${h}px"></div></div>`;
+      }).join('')}</div>`;
+    }
+  } catch (err) {
+    revEl.textContent = '—'; ordEl.textContent = '—'; aovEl.textContent = '—'; custEl.textContent = '—';
+    chartEl.innerHTML = `<div class="rev-empty">${escapeHtml(err.message)}</div>`;
+  }
+
+  try {
+    const data = await api('/api/order?action=list&limit=500');
+    const orders = data.orders || [];
+    if (!orders.length) {
+      statusEl.innerHTML = '<div class="empty-state">No orders yet.</div>';
+      return;
+    }
+    const counts = {};
+    orders.forEach((o) => { const s = o.status || 'unknown'; counts[s] = (counts[s] || 0) + 1; });
+    const entries = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+    const total = orders.length;
+    let gradientParts = []; let cursor = 0;
+    entries.forEach(([, count], i) => {
+      const pct = (count / total) * 100;
+      const color = DONUT_COLORS[i % DONUT_COLORS.length];
+      gradientParts.push(`${color} ${cursor}% ${cursor + pct}%`);
+      cursor += pct;
+    });
+    statusEl.innerHTML = `
+      <div class="donut-wrap">
+        <div class="donut" style="background:conic-gradient(${gradientParts.join(',')})"></div>
+        <div class="donut-legend">
+          ${entries.map(([label, count], i) => `
+            <div class="donut-legend-row">
+              <span class="donut-dot" style="background:${DONUT_COLORS[i % DONUT_COLORS.length]}"></span>
+              <span class="lname">${escapeHtml(label)}</span>
+              <span class="lpct">${count} · ${Math.round((count / total) * 100)}%</span>
+            </div>`).join('')}
+        </div>
+      </div>`;
+  } catch (err) {
+    statusEl.innerHTML = `<div class="empty-state">${escapeHtml(err.message)}</div>`;
+  }
+}
+
+async function loadAnalyticsCategoryDonut() {
+  const el = document.getElementById('an-category-donut');
+  try {
+    const data = await api('/api/products?action=list');
+    const products = data.products || [];
+    if (!products.length) { el.innerHTML = '<div class="empty-state">No products yet.</div>'; return; }
+    const counts = {};
+    products.forEach((p) => { const label = p.catLabel || p.cat || 'Other'; counts[label] = (counts[label] || 0) + 1; });
+    const entries = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+    const total = products.length;
+    let gradientParts = []; let cursor = 0;
+    entries.forEach(([, count], i) => {
+      const pct = (count / total) * 100;
+      const color = DONUT_COLORS[i % DONUT_COLORS.length];
+      gradientParts.push(`${color} ${cursor}% ${cursor + pct}%`);
+      cursor += pct;
+    });
+    el.innerHTML = `
+      <div class="donut-wrap">
+        <div class="donut" style="background:conic-gradient(${gradientParts.join(',')})"></div>
+        <div class="donut-legend">
+          ${entries.map(([label, count], i) => `
+            <div class="donut-legend-row">
+              <span class="donut-dot" style="background:${DONUT_COLORS[i % DONUT_COLORS.length]}"></span>
+              <span class="lname">${escapeHtml(label)}</span>
+              <span class="lpct">${Math.round((count / total) * 100)}%</span>
+            </div>`).join('')}
+        </div>
+      </div>`;
+  } catch (err) {
+    el.innerHTML = `<div class="empty-state">${escapeHtml(err.message)}</div>`;
+  }
+}
+
+async function loadAnalyticsForecast() {
+  const el = document.getElementById('an-forecast');
+  el.innerHTML = '<div class="empty-state">Loading…</div>';
+  try {
+    const data = await api('/api/admin?action=marketing-forecast');
+    if (!data.ready) {
+      el.innerHTML = `<div class="empty-state">${escapeHtml(data.message)}</div>`;
+      return;
+    }
+    const trendColor = data.revenueTrendPct == null ? 'var(--gray)' : (data.revenueTrendPct >= 0 ? 'var(--gold)' : '#e57373');
+    const trendText = data.revenueTrendPct == null ? '—' : `${data.revenueTrendPct > 0 ? '+' : ''}${data.revenueTrendPct}%`;
+    el.innerHTML = `
+      <div class="stat-grid-sm" style="max-width:none;grid-template-columns:repeat(3,1fr);margin-bottom:10px">
+        <div class="stat-card glass"><div class="num" style="color:${trendColor}">${trendText}</div><div class="label">Revenue trend vs prior 14 days</div></div>
+        <div class="stat-card glass"><div class="num">${data.recentDailyOrderRate}</div><div class="label">Orders / day (recent)</div></div>
+        <div class="stat-card glass"><div class="num">₹${data.projectedNext14DayRevenue.toLocaleString('en-IN')}</div><div class="label">Projected next 14 days</div></div>
+      </div>
+      <div style="font-size:11px;color:var(--gray)">${escapeHtml(data.note)}</div>`;
+  } catch (err) {
+    el.innerHTML = `<div class="empty-state">${escapeHtml(err.message)}</div>`;
   }
 }
 
