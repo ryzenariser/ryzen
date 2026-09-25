@@ -743,6 +743,259 @@ async function hasOrgTitleAccess(session, allowedTitles) {
   return !!(data && data.org_title && allowedTitles.includes(data.org_title));
 }
 
+// Writes one row to admin_logs for any privileged write below. Best-effort:
+// a logging failure should never block the action itself, so it only
+// console.errors rather than throwing.
+async function logAdminAction(session, action, targetId, details) {
+  try {
+    await supabase.from('admin_logs').insert({
+      actor_id: session.sub,
+      action,
+      target_id: targetId || null,
+      details: details || {},
+    });
+  } catch (err) {
+    console.error('logAdminAction failed:', err.message);
+  }
+}
+
+/* ── Finance Command Center: real numbers from `expenses`, `tax_records`,
+   and `returns` — the ONLY financial tables that currently exist. No
+   profit/margin figures here since `product_costs` has no rows yet; once
+   it's populated, gross margin can be added as expenses joined against
+   revenue from /api/order. Until then this reports spend and refunds
+   only — never a fabricated profit number. Super Admin or CFO seat. ── */
+async function handleFinanceOverview(req, res) {
+  const session = requireAuth(req, res);
+  if (!session) return;
+  if (!(await hasOrgTitleAccess(session, ['CFO']))) {
+    return res.status(403).json({ error: 'Restricted to Super Admin or the CFO seat.' });
+  }
+
+  const [expensesRes, taxRes, returnsRes] = await Promise.all([
+    supabase.from('expenses').select('id, spent_on, category, description, amount, paid_to').order('spent_on', { ascending: false }),
+    supabase.from('tax_records').select('period, tax_type, collected, paid, filed_on').order('period', { ascending: false }).limit(6),
+    supabase.from('returns').select('status, refund_amount'),
+  ]);
+  if (expensesRes.error) throw expensesRes.error;
+  if (taxRes.error) throw taxRes.error;
+  if (returnsRes.error) throw returnsRes.error;
+
+  const expenses = expensesRes.data || [];
+  const totalExpenses = expenses.reduce((sum, e) => sum + Number(e.amount || 0), 0);
+
+  const byCategory = {};
+  expenses.forEach((e) => {
+    byCategory[e.category] = (byCategory[e.category] || 0) + Number(e.amount || 0);
+  });
+
+  const now = new Date();
+  const monthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  const monthExpenses = expenses
+    .filter((e) => (e.spent_on || '').startsWith(monthKey))
+    .reduce((sum, e) => sum + Number(e.amount || 0), 0);
+
+  const returns = returnsRes.data || [];
+  const refundedTotal = returns
+    .filter((r) => r.status === 'refunded')
+    .reduce((sum, r) => sum + Number(r.refund_amount || 0), 0);
+  const pendingRefunds = returns.filter((r) => r.status === 'requested' || r.status === 'approved').length;
+
+  return res.status(200).json({
+    totalExpenses,
+    monthExpenses,
+    expensesByCategory: byCategory,
+    recentExpenses: expenses.slice(0, 15),
+    taxRecords: taxRes.data || [],
+    refundedTotal,
+    pendingRefunds,
+    dataAvailable: expenses.length > 0 || returns.length > 0,
+  });
+}
+
+async function handleExpenseCreate(req, res) {
+  const session = requireAuth(req, res);
+  if (!session) return;
+  if (!(await hasOrgTitleAccess(session, ['CFO']))) {
+    return res.status(403).json({ error: 'Restricted to Super Admin or the CFO seat.' });
+  }
+  const { spent_on, category, description, amount, paid_to } = req.body || {};
+  if (!spent_on || !category || amount === undefined || amount === null) {
+    return res.status(400).json({ error: 'spent_on, category, and amount are required.' });
+  }
+  if (Number(amount) < 0) return res.status(400).json({ error: 'amount cannot be negative.' });
+
+  const { data, error } = await supabase
+    .from('expenses')
+    .insert({ spent_on, category, description: description || null, amount, paid_to: paid_to || null })
+    .select('*')
+    .single();
+  if (error) throw error;
+
+  await logAdminAction(session, 'expense_create', data.id, { category, amount, spent_on });
+  return res.status(200).json({ expense: data });
+}
+
+async function handleExpenseDelete(req, res) {
+  const session = requireAuth(req, res);
+  if (!session) return;
+  if (!(await hasOrgTitleAccess(session, ['CFO']))) {
+    return res.status(403).json({ error: 'Restricted to Super Admin or the CFO seat.' });
+  }
+  const { id } = req.body || {};
+  if (!id) return res.status(400).json({ error: 'id is required.' });
+
+  const { error } = await supabase.from('expenses').delete().eq('id', id);
+  if (error) throw error;
+
+  await logAdminAction(session, 'expense_delete', id, {});
+  return res.status(200).json({ success: true });
+}
+
+/* ── Inventory Command Center: real `stock_levels` + `warehouses` tables.
+   Both currently empty — this is genuinely new surface area, not a
+   reskin of the product catalog. Status thresholds come straight from
+   each row's own `reorder_at`, never a hardcoded number. Super Admin
+   or COO seat. ── */
+async function handleInventoryOverview(req, res) {
+  const session = requireAuth(req, res);
+  if (!session) return;
+  if (!(await hasOrgTitleAccess(session, ['COO']))) {
+    return res.status(403).json({ error: 'Restricted to Super Admin or the COO seat.' });
+  }
+
+  const [stockRes, warehousesRes] = await Promise.all([
+    supabase.from('stock_levels').select('id, product_name, size, warehouse_id, quantity, reorder_at, updated_at').order('product_name'),
+    supabase.from('warehouses').select('id, name, city'),
+  ]);
+  if (stockRes.error) throw stockRes.error;
+  if (warehousesRes.error) throw warehousesRes.error;
+
+  const warehouses = warehousesRes.data || [];
+  const whMap = {};
+  warehouses.forEach((w) => { whMap[w.id] = w; });
+
+  const stock = (stockRes.data || []).map((s) => ({
+    ...s,
+    warehouseName: whMap[s.warehouse_id]?.name || 'Unassigned',
+    status: s.quantity <= 0 ? 'out' : s.quantity <= s.reorder_at ? 'low' : 'healthy',
+  }));
+
+  return res.status(200).json({
+    totalUnits: stock.reduce((sum, s) => sum + Number(s.quantity || 0), 0),
+    outOfStock: stock.filter((s) => s.status === 'out').length,
+    lowStock: stock.filter((s) => s.status === 'low').length,
+    warehouseCount: warehouses.length,
+    warehouses,
+    stock,
+    dataAvailable: stock.length > 0,
+  });
+}
+
+async function handleWarehouseCreate(req, res) {
+  const session = requireAuth(req, res);
+  if (!session) return;
+  if (!(await hasOrgTitleAccess(session, ['COO']))) {
+    return res.status(403).json({ error: 'Restricted to Super Admin or the COO seat.' });
+  }
+  const { name, city } = req.body || {};
+  if (!name || !name.trim()) return res.status(400).json({ error: 'name is required.' });
+
+  const { data, error } = await supabase.from('warehouses').insert({ name: name.trim(), city: city || null }).select('*').single();
+  if (error) throw error;
+
+  await logAdminAction(session, 'warehouse_create', data.id, { name, city });
+  return res.status(200).json({ warehouse: data });
+}
+
+// Handles both: editing an existing stock row (pass id) and creating a new
+// one (pass product_name/size/warehouse_id instead). One endpoint because
+// the frontend's stock table uses the same inline-edit row for both.
+async function handleStockAdjust(req, res) {
+  const session = requireAuth(req, res);
+  if (!session) return;
+  if (!(await hasOrgTitleAccess(session, ['COO']))) {
+    return res.status(403).json({ error: 'Restricted to Super Admin or the COO seat.' });
+  }
+  const { id, product_name, size, warehouse_id, quantity, reorder_at } = req.body || {};
+
+  if (id) {
+    const updates = { updated_at: new Date().toISOString() };
+    if (quantity !== undefined) {
+      if (Number(quantity) < 0) return res.status(400).json({ error: 'quantity cannot be negative.' });
+      updates.quantity = quantity;
+    }
+    if (reorder_at !== undefined) updates.reorder_at = reorder_at;
+
+    const { data, error } = await supabase.from('stock_levels').update(updates).eq('id', id).select('*').single();
+    if (error) throw error;
+
+    await logAdminAction(session, 'stock_adjust', id, updates);
+    return res.status(200).json({ stock: data });
+  }
+
+  if (!product_name || !size || !warehouse_id) {
+    return res.status(400).json({ error: 'product_name, size, and warehouse_id are required for a new stock row.' });
+  }
+  const { data, error } = await supabase
+    .from('stock_levels')
+    .insert({ product_name, size, warehouse_id, quantity: quantity ?? 0, reorder_at: reorder_at ?? 5 })
+    .select('*')
+    .single();
+  if (error) throw error;
+
+  await logAdminAction(session, 'stock_create', data.id, { product_name, size, quantity: data.quantity });
+  return res.status(200).json({ stock: data });
+}
+
+/* ── Returns Command Center: real `returns` table, zero rows today but
+   fully wired end-to-end. Every status change is audited and traceable
+   to `order_ref`. Return rate isn't computed yet — it needs a total
+   order count over a matching window, which lives in api/order.js, not
+   here; left null with a note rather than guessed. Super Admin, COO,
+   or CFO. ── */
+async function handleReturnsList(req, res) {
+  const session = requireAuth(req, res);
+  if (!session) return;
+  if (!(await hasOrgTitleAccess(session, ['COO', 'CFO']))) {
+    return res.status(403).json({ error: 'Restricted to Super Admin, COO, or CFO.' });
+  }
+  const { data, error } = await supabase.from('returns').select('*').order('created_at', { ascending: false });
+  if (error) throw error;
+
+  const returns = data || [];
+  const byStatus = {};
+  returns.forEach((r) => { byStatus[r.status] = (byStatus[r.status] || 0) + 1; });
+
+  return res.status(200).json({
+    returns,
+    byStatus,
+    returnRate: null,
+    dataAvailable: returns.length > 0,
+  });
+}
+
+async function handleReturnUpdateStatus(req, res) {
+  const session = requireAuth(req, res);
+  if (!session) return;
+  if (!(await hasOrgTitleAccess(session, ['COO', 'CFO']))) {
+    return res.status(403).json({ error: 'Restricted to Super Admin, COO, or CFO.' });
+  }
+  const { id, status, refund_amount } = req.body || {};
+  const allowed = ['requested', 'approved', 'received', 'refunded', 'rejected'];
+  if (!id || !status) return res.status(400).json({ error: 'id and status are required.' });
+  if (!allowed.includes(status)) return res.status(400).json({ error: `status must be one of: ${allowed.join(', ')}` });
+
+  const updates = { status };
+  if (refund_amount !== undefined) updates.refund_amount = refund_amount;
+
+  const { data, error } = await supabase.from('returns').update(updates).eq('id', id).select('*').single();
+  if (error) throw error;
+
+  await logAdminAction(session, 'return_status_update', id, { status, refund_amount });
+  return res.status(200).json({ return: data });
+}
+
 async function handleSystemStatus(req, res) {
   const session = requireAuth(req, res);
   if (!session) return;
@@ -2867,6 +3120,16 @@ module.exports = async function handler(req, res) {
     if (req.method === 'GET' && action === 'ai-control-agents') return await handleAiControlAgents(req, res);
     if (req.method === 'GET' && action === 'ai-control-logs') return await handleAiControlLogs(req, res);
     if (req.method === 'GET' && action === 'ai-control-health') return await handleAiControlHealth(req, res);
+
+    // Finance / Inventory / Returns Command Centers
+    if (req.method === 'GET' && action === 'finance-overview') return await handleFinanceOverview(req, res);
+    if (req.method === 'POST' && action === 'expense-create') return await handleExpenseCreate(req, res);
+    if (req.method === 'POST' && action === 'expense-delete') return await handleExpenseDelete(req, res);
+    if (req.method === 'GET' && action === 'inventory-overview') return await handleInventoryOverview(req, res);
+    if (req.method === 'POST' && action === 'warehouse-create') return await handleWarehouseCreate(req, res);
+    if (req.method === 'POST' && action === 'stock-adjust') return await handleStockAdjust(req, res);
+    if (req.method === 'GET' && action === 'returns-list') return await handleReturnsList(req, res);
+    if (req.method === 'POST' && action === 'return-update-status') return await handleReturnUpdateStatus(req, res);
     return res.status(400).json({ error: 'Unknown action: ' + action });
   } catch (err) {
     console.error('admin.js error:', err);
