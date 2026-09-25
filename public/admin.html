@@ -445,6 +445,9 @@ tbody tr:hover{background:rgba(255,255,255,.02)}
         <span id="mkt-nav-badge" style="display:none;width:7px;height:7px;border-radius:50%;background:var(--gold);margin-left:auto"></span>
       </div>
       <div class="nav-item disabled"><svg class="icon"><use href="#i-image"/></svg>Media Library <span class="tag">Soon</span></div>
+      <div class="nav-item" data-tab="finance" id="nav-finance" style="display:none"><svg class="icon"><use href="#i-chart"/></svg>Finance</div>
+      <div class="nav-item" data-tab="inventory" id="nav-inventory" style="display:none"><svg class="icon"><use href="#i-box"/></svg>Inventory</div>
+      <div class="nav-item" data-tab="returns" id="nav-returns" style="display:none"><svg class="icon"><use href="#i-cart"/></svg>Returns</div>
       <div class="nav-item" data-tab="orgchart"><svg class="icon"><use href="#i-users"/></svg>Org Chart</div>
       <div class="nav-item" data-tab="admins" id="nav-admins" style="display:none"><svg class="icon"><use href="#i-users"/></svg>Admins</div>
       <div class="nav-item disabled"><svg class="icon"><use href="#i-settings"/></svg>Settings <span class="tag">Soon</span></div>
@@ -613,6 +616,92 @@ tbody tr:hover{background:rgba(255,255,255,.02)}
         <div class="table-wrap glass"><table>
           <thead><tr><th>When</th><th>Customer</th><th>Amount</th><th>Status</th><th>Razorpay ID</th><th></th></tr></thead>
           <tbody id="orders-tbody"><tr><td colspan="6" class="empty-state">Loading…</td></tr></tbody>
+        </table></div>
+      </div>
+
+      <!-- Finance Command Center -->
+      <div class="tab-view" id="tab-finance" style="display:none">
+        <div class="topbar"><h1>Finance</h1><button class="link-btn" id="logout-btn-finance">Log out</button></div>
+        <div class="stat-grid">
+          <div class="stat-card glass"><div class="num" id="fin-total-expenses">—</div><div class="label">Total Expenses</div></div>
+          <div class="stat-card glass"><div class="num" id="fin-month-expenses">—</div><div class="label">This Month</div></div>
+          <div class="stat-card glass"><div class="num" id="fin-refunded">—</div><div class="label">Refunded to Date</div></div>
+          <div class="stat-card glass"><div class="num" id="fin-pending-refunds">—</div><div class="label">Pending Refunds</div></div>
+        </div>
+        <div class="dash-grid" style="margin-top:20px">
+          <div class="panel glass">
+            <div class="panel-hdr"><h2>Log an Expense</h2></div>
+            <form id="expense-form">
+              <div class="field"><label>Date</label><input type="date" id="exp-date" required /></div>
+              <div class="field"><label>Category</label><input type="text" id="exp-category" placeholder="e.g. Fabric, Shipping, Ads" required /></div>
+              <div class="field"><label>Amount (₹)</label><input type="number" id="exp-amount" min="0" step="0.01" required /></div>
+              <div class="field"><label>Paid To</label><input type="text" id="exp-paid-to" placeholder="Optional" /></div>
+              <div class="field"><label>Description</label><input type="text" id="exp-description" placeholder="Optional" /></div>
+              <div class="error-msg" id="exp-error"></div>
+              <button type="submit" class="btn btn-gold btn-sm">Save Expense</button>
+            </form>
+          </div>
+          <div class="panel glass">
+            <div class="panel-hdr"><h2>Expenses by Category</h2></div>
+            <div id="fin-by-category"><div class="empty-state">Loading…</div></div>
+          </div>
+        </div>
+        <div class="table-wrap glass" style="margin-top:20px"><table>
+          <thead><tr><th>Date</th><th>Category</th><th>Description</th><th>Paid To</th><th>Amount</th><th></th></tr></thead>
+          <tbody id="fin-expenses-tbody"><tr><td colspan="6" class="empty-state">Loading…</td></tr></tbody>
+        </table></div>
+      </div>
+
+      <!-- Inventory Command Center -->
+      <div class="tab-view" id="tab-inventory" style="display:none">
+        <div class="topbar"><h1>Inventory</h1><button class="link-btn" id="logout-btn-inventory">Log out</button></div>
+        <div class="stat-grid">
+          <div class="stat-card glass"><div class="num" id="inv-total-units">—</div><div class="label">Total Units</div></div>
+          <div class="stat-card glass"><div class="num" id="inv-out-of-stock">—</div><div class="label">🔴 Out of Stock</div></div>
+          <div class="stat-card glass"><div class="num" id="inv-low-stock">—</div><div class="label">🟡 Low Stock</div></div>
+          <div class="stat-card glass"><div class="num" id="inv-warehouses">—</div><div class="label">Warehouses</div></div>
+        </div>
+        <div class="dash-grid" style="margin-top:20px">
+          <div class="panel glass">
+            <div class="panel-hdr"><h2>Add Warehouse</h2></div>
+            <form id="warehouse-form">
+              <div class="field"><label>Name</label><input type="text" id="wh-name" required /></div>
+              <div class="field"><label>City</label><input type="text" id="wh-city" placeholder="Optional" /></div>
+              <div class="error-msg" id="wh-error"></div>
+              <button type="submit" class="btn btn-gold btn-sm">Add Warehouse</button>
+            </form>
+          </div>
+          <div class="panel glass">
+            <div class="panel-hdr"><h2>Add / Adjust Stock</h2></div>
+            <form id="stock-form">
+              <div class="field"><label>Product Name</label><input type="text" id="stk-product" required /></div>
+              <div class="field"><label>Size</label><input type="text" id="stk-size" required /></div>
+              <div class="field"><label>Warehouse</label><select id="stk-warehouse" required></select></div>
+              <div class="field"><label>Quantity</label><input type="number" id="stk-quantity" min="0" value="0" required /></div>
+              <div class="field"><label>Reorder At</label><input type="number" id="stk-reorder" min="0" value="5" required /></div>
+              <div class="error-msg" id="stk-error"></div>
+              <button type="submit" class="btn btn-gold btn-sm">Save</button>
+            </form>
+          </div>
+        </div>
+        <div class="table-wrap glass" style="margin-top:20px"><table>
+          <thead><tr><th>Product</th><th>Size</th><th>Warehouse</th><th>Qty</th><th>Reorder At</th><th>Status</th></tr></thead>
+          <tbody id="inv-stock-tbody"><tr><td colspan="6" class="empty-state">Loading…</td></tr></tbody>
+        </table></div>
+      </div>
+
+      <!-- Returns Command Center -->
+      <div class="tab-view" id="tab-returns" style="display:none">
+        <div class="topbar"><h1>Returns</h1><button class="link-btn" id="logout-btn-returns">Log out</button></div>
+        <div class="stat-grid">
+          <div class="stat-card glass"><div class="num" id="ret-requested">—</div><div class="label">Requested</div></div>
+          <div class="stat-card glass"><div class="num" id="ret-approved">—</div><div class="label">Approved</div></div>
+          <div class="stat-card glass"><div class="num" id="ret-refunded">—</div><div class="label">Refunded</div></div>
+          <div class="stat-card glass"><div class="num" id="ret-rejected">—</div><div class="label">Rejected</div></div>
+        </div>
+        <div class="table-wrap glass" style="margin-top:20px"><table>
+          <thead><tr><th>Order Ref</th><th>Reason</th><th>Refund Amount</th><th>Status</th><th>Requested</th><th></th></tr></thead>
+          <tbody id="ret-tbody"><tr><td colspan="6" class="empty-state">Loading…</td></tr></tbody>
         </table></div>
       </div>
 
@@ -1530,7 +1619,7 @@ document.getElementById('face-enroll-capture-btn').addEventListener('click', asy
 document.getElementById('setup-faceid-btn').addEventListener('click', () => openFaceEnroll({ skippable: true }));
 document.getElementById('nav-set-faceid').addEventListener('click', () => openFaceEnroll({ skippable: true }));
 
-['logout-btn', 'logout-btn-2', 'logout-btn-3', 'logout-btn-4', 'logout-btn-5', 'logout-btn-orders', 'logout-btn-reports', 'logout-btn-integrations', 'logout-btn-system', 'logout-btn-marketing', 'logout-btn-orgchart', 'logout-btn-mydashboard', 'logout-btn-maintenance'].forEach((id) => {
+['logout-btn', 'logout-btn-2', 'logout-btn-3', 'logout-btn-4', 'logout-btn-5', 'logout-btn-orders', 'logout-btn-reports', 'logout-btn-integrations', 'logout-btn-system', 'logout-btn-marketing', 'logout-btn-orgchart', 'logout-btn-mydashboard', 'logout-btn-maintenance', 'logout-btn-finance', 'logout-btn-inventory', 'logout-btn-returns'].forEach((id) => {
   document.getElementById(id).addEventListener('click', () => { clearToken(); showLogin(); });
 });
 
@@ -1590,6 +1679,9 @@ document.querySelectorAll('.nav-item[data-tab]').forEach((item) => {
     if (item.dataset.tab === 'marketing') loadMarketingOverview();
     if (item.dataset.tab === 'orgchart') renderOrgChart();
     if (item.dataset.tab === 'mydashboard') loadMyDashboard();
+    if (item.dataset.tab === 'finance') loadFinanceOverview();
+    if (item.dataset.tab === 'inventory') loadInventoryOverview();
+    if (item.dataset.tab === 'returns') loadReturnsList();
   });
 });
 
@@ -2701,6 +2793,9 @@ async function loadDashboard() {
     document.getElementById('nav-integrations').style.display = (currentRole === 'super_admin' || currentOrgTitle === 'CTO') ? 'flex' : 'none';
     document.getElementById('nav-system').style.display = (currentRole === 'super_admin' || currentOrgTitle === 'CTO') ? 'flex' : 'none';
     document.getElementById('nav-maintenance').style.display = currentRole === 'super_admin' ? 'flex' : 'none';
+    document.getElementById('nav-finance').style.display = (currentRole === 'super_admin' || currentOrgTitle === 'CFO') ? 'flex' : 'none';
+    document.getElementById('nav-inventory').style.display = (currentRole === 'super_admin' || currentOrgTitle === 'COO') ? 'flex' : 'none';
+    document.getElementById('nav-returns').style.display = (currentRole === 'super_admin' || currentOrgTitle === 'COO' || currentOrgTitle === 'CFO') ? 'flex' : 'none';
     initModeSwitcher();
     loadDashboardActivity();
     loadDashboardProductWidgets();
@@ -2973,6 +3068,204 @@ document.getElementById('product-bulk-delete').addEventListener('click', async (
     btn.disabled = false; btn.textContent = 'Delete selected';
   }
 });
+
+/* ---------- Finance (real, via /api/admin?action=finance-overview) ---------- */
+async function loadFinanceOverview() {
+  try {
+    const data = await api('/api/admin?action=finance-overview');
+    document.getElementById('fin-total-expenses').textContent = formatInr(data.totalExpenses);
+    document.getElementById('fin-month-expenses').textContent = formatInr(data.monthExpenses);
+    document.getElementById('fin-refunded').textContent = formatInr(data.refundedTotal);
+    document.getElementById('fin-pending-refunds').textContent = data.pendingRefunds;
+
+    const catEl = document.getElementById('fin-by-category');
+    const entries = Object.entries(data.expensesByCategory || {});
+    catEl.innerHTML = entries.length
+      ? entries.sort((a, b) => b[1] - a[1]).map(([cat, amt]) => `
+          <div class="donut-legend-row">
+            <span class="lname">${escapeHtml(cat)}</span>
+            <span class="lpct">${formatInr(amt)}</span>
+          </div>`).join('')
+      : '<div class="empty-state">No expenses logged yet.</div>';
+
+    const tbody = document.getElementById('fin-expenses-tbody');
+    tbody.innerHTML = (data.recentExpenses || []).length
+      ? data.recentExpenses.map((e) => `
+          <tr>
+            <td>${escapeHtml(e.spent_on)}</td>
+            <td>${escapeHtml(e.category)}</td>
+            <td>${escapeHtml(e.description || '—')}</td>
+            <td>${escapeHtml(e.paid_to || '—')}</td>
+            <td>${formatInr(e.amount)}</td>
+            <td><button class="btn btn-danger btn-sm" onclick="deleteExpense('${e.id}')">Delete</button></td>
+          </tr>`).join('')
+      : '<tr><td colspan="6" class="empty-state">No expenses logged yet — add one on the left.</td></tr>';
+  } catch (err) {
+    document.getElementById('fin-expenses-tbody').innerHTML = `<tr><td colspan="6" class="empty-state">${escapeHtml(err.message)}</td></tr>`;
+  }
+}
+
+document.getElementById('expense-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const errEl = document.getElementById('exp-error');
+  errEl.textContent = '';
+  try {
+    await api('/api/admin?action=expense-create', {
+      method: 'POST',
+      body: JSON.stringify({
+        spent_on: document.getElementById('exp-date').value,
+        category: document.getElementById('exp-category').value.trim(),
+        amount: Number(document.getElementById('exp-amount').value),
+        paid_to: document.getElementById('exp-paid-to').value.trim() || undefined,
+        description: document.getElementById('exp-description').value.trim() || undefined,
+      }),
+    });
+    e.target.reset();
+    loadFinanceOverview();
+  } catch (err) {
+    errEl.textContent = err.message;
+  }
+});
+
+async function deleteExpense(id) {
+  if (!confirm('Delete this expense?')) return;
+  try {
+    await api('/api/admin?action=expense-delete', { method: 'POST', body: JSON.stringify({ id }) });
+    loadFinanceOverview();
+  } catch (err) {
+    alert(err.message);
+  }
+}
+
+/* ---------- Inventory (real, via /api/admin?action=inventory-overview) ---------- */
+const STOCK_STATUS_LABEL = { out: '🔴 Out', low: '🟡 Low', healthy: '🟢 Healthy' };
+let inventoryWarehouses = [];
+
+async function loadInventoryOverview() {
+  try {
+    const data = await api('/api/admin?action=inventory-overview');
+    document.getElementById('inv-total-units').textContent = data.totalUnits;
+    document.getElementById('inv-out-of-stock').textContent = data.outOfStock;
+    document.getElementById('inv-low-stock').textContent = data.lowStock;
+    document.getElementById('inv-warehouses').textContent = data.warehouseCount;
+
+    inventoryWarehouses = data.warehouses || [];
+    const whSelect = document.getElementById('stk-warehouse');
+    whSelect.innerHTML = inventoryWarehouses.length
+      ? inventoryWarehouses.map((w) => `<option value="${w.id}">${escapeHtml(w.name)}${w.city ? ' — ' + escapeHtml(w.city) : ''}</option>`).join('')
+      : '<option value="">Add a warehouse first</option>';
+
+    const tbody = document.getElementById('inv-stock-tbody');
+    tbody.innerHTML = (data.stock || []).length
+      ? data.stock.map((s) => `
+          <tr>
+            <td>${escapeHtml(s.product_name)}</td>
+            <td>${escapeHtml(s.size)}</td>
+            <td>${escapeHtml(s.warehouseName)}</td>
+            <td><input type="number" min="0" value="${s.quantity}" style="width:80px" onchange="adjustStock('${s.id}', this.value, null)" /></td>
+            <td><input type="number" min="0" value="${s.reorder_at}" style="width:80px" onchange="adjustStock('${s.id}', null, this.value)" /></td>
+            <td>${STOCK_STATUS_LABEL[s.status]}</td>
+          </tr>`).join('')
+      : '<tr><td colspan="6" class="empty-state">No stock rows yet — add a warehouse, then a stock row.</td></tr>';
+  } catch (err) {
+    document.getElementById('inv-stock-tbody').innerHTML = `<tr><td colspan="6" class="empty-state">${escapeHtml(err.message)}</td></tr>`;
+  }
+}
+
+document.getElementById('warehouse-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const errEl = document.getElementById('wh-error');
+  errEl.textContent = '';
+  try {
+    await api('/api/admin?action=warehouse-create', {
+      method: 'POST',
+      body: JSON.stringify({
+        name: document.getElementById('wh-name').value.trim(),
+        city: document.getElementById('wh-city').value.trim() || undefined,
+      }),
+    });
+    e.target.reset();
+    loadInventoryOverview();
+  } catch (err) {
+    errEl.textContent = err.message;
+  }
+});
+
+document.getElementById('stock-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const errEl = document.getElementById('stk-error');
+  errEl.textContent = '';
+  try {
+    await api('/api/admin?action=stock-adjust', {
+      method: 'POST',
+      body: JSON.stringify({
+        product_name: document.getElementById('stk-product').value.trim(),
+        size: document.getElementById('stk-size').value.trim(),
+        warehouse_id: document.getElementById('stk-warehouse').value,
+        quantity: Number(document.getElementById('stk-quantity').value),
+        reorder_at: Number(document.getElementById('stk-reorder').value),
+      }),
+    });
+    e.target.reset();
+    loadInventoryOverview();
+  } catch (err) {
+    errEl.textContent = err.message;
+  }
+});
+
+async function adjustStock(id, quantity, reorder_at) {
+  try {
+    const body = { id };
+    if (quantity !== null) body.quantity = Number(quantity);
+    if (reorder_at !== null) body.reorder_at = Number(reorder_at);
+    await api('/api/admin?action=stock-adjust', { method: 'POST', body: JSON.stringify(body) });
+    loadInventoryOverview();
+  } catch (err) {
+    alert(err.message);
+  }
+}
+
+/* ---------- Returns (real, via /api/admin?action=returns-list) ---------- */
+const RETURN_STATUSES = ['requested', 'approved', 'received', 'refunded', 'rejected'];
+
+async function loadReturnsList() {
+  try {
+    const data = await api('/api/admin?action=returns-list');
+    const by = data.byStatus || {};
+    document.getElementById('ret-requested').textContent = by.requested || 0;
+    document.getElementById('ret-approved').textContent = by.approved || 0;
+    document.getElementById('ret-refunded').textContent = by.refunded || 0;
+    document.getElementById('ret-rejected').textContent = by.rejected || 0;
+
+    const tbody = document.getElementById('ret-tbody');
+    tbody.innerHTML = (data.returns || []).length
+      ? data.returns.map((r) => `
+          <tr>
+            <td>${escapeHtml(r.order_ref)}</td>
+            <td>${escapeHtml(r.reason || '—')}</td>
+            <td>${r.refund_amount ? formatInr(r.refund_amount) : '—'}</td>
+            <td>
+              <select onchange="updateReturnStatus('${r.id}', this.value)">
+                ${RETURN_STATUSES.map((s) => `<option value="${s}" ${s === r.status ? 'selected' : ''}>${s}</option>`).join('')}
+              </select>
+            </td>
+            <td>${new Date(r.created_at).toLocaleDateString()}</td>
+            <td></td>
+          </tr>`).join('')
+      : '<tr><td colspan="6" class="empty-state">No return requests yet.</td></tr>';
+  } catch (err) {
+    document.getElementById('ret-tbody').innerHTML = `<tr><td colspan="6" class="empty-state">${escapeHtml(err.message)}</td></tr>`;
+  }
+}
+
+async function updateReturnStatus(id, status) {
+  try {
+    await api('/api/admin?action=return-update-status', { method: 'POST', body: JSON.stringify({ id, status }) });
+    loadReturnsList();
+  } catch (err) {
+    alert(err.message);
+  }
+}
 
 function escapeHtml(s) { return String(s || '').replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 function escapeAttr(s) { return String(s || '').replace(/'/g, "\\'"); }
