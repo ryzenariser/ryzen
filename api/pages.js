@@ -1,6 +1,5 @@
 const { supabase } = require('./_lib/supabase');
 const { requireAuth } = require('./_lib/auth');
-const { sql } = require('./_lib/neon');
 
 // Reserved slug for the single row that stores the homepage's extra,
 // admin-managed sections. This row is never shown in the normal Pages
@@ -49,20 +48,6 @@ function slugify(title) {
 
 module.exports = async (req, res) => {
   const action = req.query.action;
-
-  // ---- TEMPORARY: Neon connection debug check ----
-  // Visit /api/pages?debug=neon-check to test the Neon connection
-  // without deploying a dedicated function (Hobby plan's 12-function cap).
-  // Remove this whole block once the connection is confirmed working.
-  if (req.query.debug === 'neon-check') {
-    try {
-      const result = await sql`SELECT 1 AS ok, now() AS server_time`;
-      return res.status(200).json({ neon_connected: true, result: result[0] });
-    } catch (err) {
-      return res.status(500).json({ neon_connected: false, error: err.message });
-    }
-  }
-  // ---- END TEMPORARY BLOCK ----
 
   try {
     let session = null;
