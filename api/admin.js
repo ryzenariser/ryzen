@@ -103,7 +103,8 @@ async function sendTelegramAlert(admin, req, faceStatus) {
       `User: ${admin.username} (${admin.role})\n` +
       `IP: ${ip}\n` +
       `Device: ${userAgent}\n` +
-      `Time: ${time}${faceLine}`;
+      `Time: ${time}${faceLine}\n` +
+      `📍 Exact location: pending browser permission…`;
 
     await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
       method: 'POST',
@@ -115,8 +116,39 @@ async function sendTelegramAlert(admin, req, faceStatus) {
   }
 }
 
-async function sendFailedLoginAlert(attemptedUsername, req) {
+// Fires once the browser's geolocation prompt resolves (handleUpdateLocation
+// below), separately from sendTelegramAlert above — GPS coordinates aren't
+// available yet at login time, only after the async browser permission
+// prompt completes. Sends a native Telegram location pin (renders as an
+// in-app map) plus a follow-up text with the admin's name and a Maps link,
+// since sendLocation has no room for a caption of its own.
+async function sendLocationAlert(username, role, latitude, longitude) {
   try {
+    const token = process.env.TELEGRAM_BOT_TOKEN;
+    const chatId = process.env.TELEGRAM_CHAT_ID;
+    if (!token || !chatId) return;
+
+    await fetch(`https://api.telegram.org/bot${token}/sendLocation`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ chat_id: chatId, latitude, longitude }),
+    });
+
+    const mapsLink = `https://www.google.com/maps?q=${latitude},${longitude}`;
+    await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chat_id: chatId,
+        text: `📍 Exact login location confirmed\nUser: ${username} (${role})\n${mapsLink}`,
+      }),
+    });
+  } catch (err) {
+    console.error('sendLocationAlert failed:', err.message);
+  }
+}
+
+async function sendFailedLoginAlert(attemptedUsername, req) {  try {
     const token = process.env.TELEGRAM_BOT_TOKEN;
     const chatId = process.env.TELEGRAM_CHAT_ID;
     if (!token || !chatId) return;
@@ -239,13 +271,16 @@ async function handleUpdateLocation(req, res) {
     return res.status(400).json({ error: 'loginLogId, latitude, and longitude are required.' });
   }
 
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from('admin_logins')
     .update({ latitude, longitude })
     .eq('id', loginLogId)
-    .eq('admin_id', session.sub); // can only update your own login row
+    .eq('admin_id', session.sub) // can only update your own login row
+    .select('id')
+    .maybeSingle();
 
   if (error) throw error;
+  if (data) await sendLocationAlert(session.username, session.role, latitude, longitude);
   return res.status(200).json({ ok: true });
 }
 
@@ -994,6 +1029,68 @@ async function handleReturnUpdateStatus(req, res) {
 
   await logAdminAction(session, 'return_status_update', id, { status, refund_amount });
   return res.status(200).json({ return: data });
+}
+
+/* ── Analytics: traffic comes from the `page_views` table, which the
+   storefront is already writing to (398 real rows) — nothing new needed
+   there, this just surfaces it. Sales-by-product and conversion analytics
+   stay out for now: `orders` and `products` have zero rows, so those
+   sections would be nothing but zeros pretending to be insight. Visible to
+   any logged-in admin since it's aggregate, non-financial traffic data. ── */
+async function handleAnalyticsOverview(req, res) {
+  const session = requireAuth(req, res);
+  if (!session) return;
+
+  const { data: rows, error } = await supabase
+    .from('page_views')
+    .select('path, user_agent, created_at')
+    .order('created_at', { ascending: false })
+    .limit(5000);
+  if (error) throw error;
+
+  const views = rows || [];
+  const now = new Date();
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const sevenDaysAgo = new Date(startOfToday.getTime() - 6 * 86400000);
+
+  const viewsToday = views.filter((v) => new Date(v.created_at) >= startOfToday).length;
+  const views7d = views.filter((v) => new Date(v.created_at) >= sevenDaysAgo).length;
+
+  const byPath = {};
+  views.forEach((v) => {
+    const p = v.path || '(unknown)';
+    byPath[p] = (byPath[p] || 0) + 1;
+  });
+  const topPages = Object.entries(byPath).sort((a, b) => b[1] - a[1]).slice(0, 10).map(([path, count]) => ({ path, count }));
+
+  const byDay = {};
+  for (let i = 13; i >= 0; i--) {
+    const d = new Date(startOfToday.getTime() - i * 86400000);
+    byDay[d.toISOString().slice(0, 10)] = 0;
+  }
+  views.forEach((v) => {
+    const key = new Date(v.created_at).toISOString().slice(0, 10);
+    if (key in byDay) byDay[key] += 1;
+  });
+  const trend = Object.entries(byDay).map(([date, count]) => ({ date, count }));
+
+  let mobile = 0;
+  let desktop = 0;
+  views.forEach((v) => {
+    const ua = (v.user_agent || '').toLowerCase();
+    if (/mobile|android|iphone|ipad/.test(ua)) mobile += 1; else desktop += 1;
+  });
+
+  return res.status(200).json({
+    totalViews: views.length,
+    viewsToday,
+    views7d,
+    uniquePages: Object.keys(byPath).length,
+    topPages,
+    trend,
+    deviceSplit: { mobile, desktop },
+    dataAvailable: views.length > 0,
+  });
 }
 
 async function handleSystemStatus(req, res) {
@@ -1879,6 +1976,155 @@ async function handleNoteDelete(req, res) {
   const { error } = await supabase.from('admin_notes').delete().eq('id', id).eq('admin_id', session.sub);
   if (error) throw error;
   return res.status(200).json({ success: true });
+}
+
+/* ── Theme Palettes: Super-Admin-managed color themes, applied across BOTH
+   the Super Admin and Sub Admin dashboards. Same single-active-row pattern
+   as Maintenance Mode above (store_theme_status, id=1 is the only row) —
+   any number of palettes can be saved, but exactly one (or none, meaning
+   "use the built-in default") is active at a time.
+
+   Only Super Admin can list/create/delete/activate palettes. Any
+   authenticated admin (Super or Sub) can read the currently active one, via
+   palette-active — that's what lets a Sub Admin's dashboard pick up
+   whatever the Super Admin applied.
+
+   Requires these two Supabase tables (create once via the SQL editor):
+
+     create table color_palettes (
+       id uuid primary key default gen_random_uuid(),
+       name text not null,
+       colors jsonb not null,
+       created_by text,
+       created_at timestamptz not null default now()
+     );
+
+     create table store_theme_status (
+       id int primary key,
+       active_palette_id uuid references color_palettes(id) on delete set null,
+       updated_by text,
+       updated_at timestamptz
+     );
+── */
+const PALETTE_KEYS = ['gold', 'goldLight', 'goldDark', 'black', 'dark', 'dark2', 'bone', 'gray'];
+const HEX_COLOR_RE = /^#[0-9a-fA-F]{6}$/;
+
+function sanitizePaletteColors(colors) {
+  if (!colors || typeof colors !== 'object') return null;
+  const clean = {};
+  for (const key of PALETTE_KEYS) {
+    const val = colors[key];
+    if (typeof val !== 'string' || !HEX_COLOR_RE.test(val)) return null;
+    clean[key] = val.toLowerCase();
+  }
+  return clean;
+}
+
+async function handlePaletteList(req, res) {
+  const session = requireAuth(req, res);
+  if (!session) return;
+  if (session.role !== 'super_admin') {
+    return res.status(403).json({ error: 'Super Admin only.' });
+  }
+  const { data: palettes, error } = await supabase
+    .from('color_palettes')
+    .select('id, name, colors, created_by, created_at')
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+
+  const { data: status } = await supabase
+    .from('store_theme_status')
+    .select('active_palette_id')
+    .eq('id', 1)
+    .maybeSingle();
+
+  return res.status(200).json({ palettes: palettes || [], activePaletteId: status ? status.active_palette_id : null });
+}
+
+async function handlePaletteCreate(req, res) {
+  const session = requireAuth(req, res);
+  if (!session) return;
+  if (session.role !== 'super_admin') {
+    return res.status(403).json({ error: 'Super Admin only.' });
+  }
+  const { name, colors } = req.body || {};
+  if (!name || !name.trim()) {
+    return res.status(400).json({ error: 'A palette name is required.' });
+  }
+  const clean = sanitizePaletteColors(colors);
+  if (!clean) {
+    return res.status(400).json({ error: 'colors must include valid 6-digit hex values for: ' + PALETTE_KEYS.join(', ') });
+  }
+  const { data, error } = await supabase
+    .from('color_palettes')
+    .insert({ name: name.trim().slice(0, 60), colors: clean, created_by: session.username || session.sub })
+    .select('id, name, colors, created_by, created_at')
+    .single();
+  if (error) throw error;
+  return res.status(200).json({ palette: data });
+}
+
+async function handlePaletteDelete(req, res) {
+  const session = requireAuth(req, res);
+  if (!session) return;
+  if (session.role !== 'super_admin') {
+    return res.status(403).json({ error: 'Super Admin only.' });
+  }
+  const { id } = req.body || {};
+  if (!id) return res.status(400).json({ error: 'id is required.' });
+
+  // If we're deleting the currently-active palette, fall back to the default
+  // theme rather than leaving a dangling reference.
+  const { data: status } = await supabase.from('store_theme_status').select('active_palette_id').eq('id', 1).maybeSingle();
+  if (status && status.active_palette_id === id) {
+    await supabase.from('store_theme_status').upsert({
+      id: 1, active_palette_id: null, updated_by: session.username || session.sub, updated_at: new Date().toISOString(),
+    });
+  }
+
+  const { error } = await supabase.from('color_palettes').delete().eq('id', id);
+  if (error) throw error;
+  return res.status(200).json({ success: true });
+}
+
+async function handlePaletteActivate(req, res) {
+  const session = requireAuth(req, res);
+  if (!session) return;
+  if (session.role !== 'super_admin') {
+    return res.status(403).json({ error: 'Super Admin only.' });
+  }
+  const { id } = req.body || {};
+
+  if (id) {
+    const { data: palette, error: findError } = await supabase.from('color_palettes').select('id').eq('id', id).maybeSingle();
+    if (findError) throw findError;
+    if (!palette) return res.status(404).json({ error: 'Palette not found.' });
+  }
+
+  const { error } = await supabase
+    .from('store_theme_status')
+    .upsert({ id: 1, active_palette_id: id || null, updated_by: session.username || session.sub, updated_at: new Date().toISOString() });
+  if (error) throw error;
+  return res.status(200).json({ success: true, activePaletteId: id || null });
+}
+
+// Readable by ANY authenticated admin (Super or Sub) — this is what lets a
+// Sub Admin's dashboard pick up the palette the Super Admin applied.
+async function handleActivePalette(req, res) {
+  const session = requireAuth(req, res);
+  if (!session) return;
+
+  const { data: status } = await supabase.from('store_theme_status').select('active_palette_id').eq('id', 1).maybeSingle();
+  if (!status || !status.active_palette_id) {
+    return res.status(200).json({ palette: null });
+  }
+  const { data: palette, error } = await supabase
+    .from('color_palettes')
+    .select('id, name, colors')
+    .eq('id', status.active_palette_id)
+    .maybeSingle();
+  if (error) throw error;
+  return res.status(200).json({ palette: palette || null });
 }
 
 /* ── Daily Cron brief: the genuine "works on its own" piece. Vercel Hobby
@@ -3109,6 +3355,11 @@ module.exports = async function handler(req, res) {
     if (req.method === 'POST' && action === 'notes-create') return await handleNoteCreate(req, res);
     if (req.method === 'POST' && action === 'notes-update') return await handleNoteUpdate(req, res);
     if (req.method === 'POST' && action === 'notes-delete') return await handleNoteDelete(req, res);
+    if (req.method === 'GET' && action === 'palette-list') return await handlePaletteList(req, res);
+    if (req.method === 'POST' && action === 'palette-create') return await handlePaletteCreate(req, res);
+    if (req.method === 'POST' && action === 'palette-delete') return await handlePaletteDelete(req, res);
+    if (req.method === 'POST' && action === 'palette-activate') return await handlePaletteActivate(req, res);
+    if (req.method === 'GET' && action === 'palette-active') return await handleActivePalette(req, res);
     if (req.method === 'GET' && action === 'cron-daily-brief') return await handleCronDailyBrief(req, res);
     if (req.method === 'GET' && action === 'cron-weekly-strategy') return await handleCronWeeklyStrategy(req, res);
     if (req.method === 'GET' && action === 'cron-weekly-pricing-check') return await handleCronWeeklyPricingCheck(req, res);
@@ -3130,6 +3381,7 @@ module.exports = async function handler(req, res) {
     if (req.method === 'POST' && action === 'stock-adjust') return await handleStockAdjust(req, res);
     if (req.method === 'GET' && action === 'returns-list') return await handleReturnsList(req, res);
     if (req.method === 'POST' && action === 'return-update-status') return await handleReturnUpdateStatus(req, res);
+    if (req.method === 'GET' && action === 'analytics-overview') return await handleAnalyticsOverview(req, res);
     return res.status(400).json({ error: 'Unknown action: ' + action });
   } catch (err) {
     console.error('admin.js error:', err);
