@@ -1,9 +1,9 @@
 // api/health-check.js
 // TEMPORARY — verifies the Neon connection is working.
 
-import { sql } from './_lib/neon.js';
+const { sql } = require('./_lib/neon.js');
 
-export default async function handler(req, res) {
+module.exports = async function handler(req, res) {
   try {
     const result = await sql`SELECT 1 AS ok, now() AS server_time`;
     return res.status(200).json({
@@ -16,4 +16,4 @@ export default async function handler(req, res) {
       error: err.message,
     });
   }
-}
+};
