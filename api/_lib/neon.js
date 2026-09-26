@@ -1,18 +1,20 @@
 // api/_lib/neon.js
 // Pooled Neon Postgres client for Vercel serverless functions.
-// Mirrors how api/_lib/supabase.js centralizes the Supabase client.
+// CommonJS, to match api/package.json's "type": "commonjs".
 
-import { neon } from '@neondatabase/serverless';
+const { neon } = require('@neondatabase/serverless');
 
 if (!process.env.NEON_DATABASE_URL) {
   throw new Error('NEON_DATABASE_URL environment variable is not set');
 }
 
-export const sql = neon(process.env.NEON_DATABASE_URL);
+const sql = neon(process.env.NEON_DATABASE_URL);
 
-export async function logAdminAction({ adminUserId, action, targetTable, targetId, details }) {
+async function logAdminAction({ adminUserId, action, targetTable, targetId, details }) {
   await sql`
     INSERT INTO audit_logs (admin_user_id, action, target_table, target_id, details)
     VALUES (${adminUserId}, ${action}, ${targetTable}, ${targetId}, ${details ? JSON.stringify(details) : null})
   `;
 }
+
+module.exports = { sql, logAdminAction };
